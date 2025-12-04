@@ -1,0 +1,72 @@
+@startuml Category_Ingredient_Management
+title Use Case Diagram: Category & Ingredient Management (UC-A3)
+
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam shadowing false
+skinparam backgroundColor white
+
+left to right direction
+
+actor "Admin" as Admin #FFA500
+
+rectangle "Category & Ingredient Management" {
+  package "Category Management" {
+    usecase "UCA03-1\nView Category List" as C1 #E0F0FF
+    usecase "UCA03-2\nCreate Category" as C2 #E0F0FF
+    usecase "UCA03-3\nUpdate Category" as C3 #E0F0FF
+    usecase "UCA03-4\nDelete Category" as C4 #E0F0FF
+  }
+  
+  package "Ingredient Management" {
+    usecase "UCA03-5\nView Ingredient List" as I1 #E0F0FF
+    usecase "UCA03-6\nCreate Ingredient" as I2 #FFE4B5
+    usecase "UCA03-7\nUpdate Ingredient" as I3 #E0F0FF
+    usecase "UCA03-8\nDelete Ingredient" as I4 #E0F0FF
+  }
+}
+
+Admin --> C1
+Admin --> C2
+Admin --> C3
+Admin --> C4
+Admin --> I1
+Admin --> I2
+Admin --> I3
+Admin --> I4
+
+' Relationships
+C3 ..> C1 : <<include>>
+C4 ..> C1 : <<include>>
+I3 ..> I1 : <<include>>
+I4 ..> I1 : <<include>>
+
+note right of C1
+  View all categories
+  Search and filter
+  Sort alphabetically
+end note
+
+note right of C4
+  Check for recipes
+  Transfer to other category
+  Prevent orphan data
+end note
+
+note right of I2
+  Add to standardized DB
+  Define units
+  Link synonyms
+end note
+
+note right of I4
+  Check recipe dependencies
+  Handle foreign key constraints
+  Suggest alternatives
+end note
+
+@enduml
+
+
+
+

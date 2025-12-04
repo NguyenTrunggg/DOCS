@@ -1,0 +1,74 @@
+@startuml Virtual_Fridge
+title Use Case Diagram: Virtual Fridge (UC5)
+
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam shadowing false
+skinparam backgroundColor white
+
+left to right direction
+
+actor "User" as User #4ECDC4
+
+rectangle "Virtual Fridge System" {
+  usecase "UCS05-1\nAdd Ingredient" as UC1 #E0F0FF
+  usecase "UCS05-2\nView Ingredient List" as UC2 #E0F0FF
+  usecase "UCS05-3\nUpdate Ingredient" as UC3 #E0F0FF
+  usecase "UCS05-4\nRemove Ingredient" as UC4 #E0F0FF
+}
+
+User --> UC1
+User --> UC2
+User --> UC3
+User --> UC4
+
+' Relationships
+UC3 ..> UC2 : <<include>>
+UC4 ..> UC2 : <<include>>
+
+note right of UC1
+  Add with quantity, unit, expiry
+  Autocomplete from standardized DB
+  Barcode scanner
+  Batch CSV import
+  Merge duplicates
+end note
+
+note right of UC2
+  View all ingredients
+  Color-coded warnings:
+  - Expired (red)
+  - Expiring soon (yellow)
+  Filter by status/category
+  Sort by name/expiry date
+  Paginate 50 items
+end note
+
+note right of UC3
+  Update quantity/unit/expiry
+  Quick +/- buttons
+  Auto unit conversion
+  (1000g = 1kg)
+  Batch update
+end note
+
+note right of UC4
+  Remove ingredient
+  Confirmation dialog
+  Suggest move to shopping list
+  Batch delete
+  Auto-delete expired (optional)
+end note
+
+note bottom of UC2
+  Smart Inventory Management:
+  - Expiry tracking
+  - Unit conversion
+  - Shopping list integration
+end note
+
+@enduml
+
+
+
+

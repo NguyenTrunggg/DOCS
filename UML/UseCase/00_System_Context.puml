@@ -1,0 +1,85 @@
+@startuml System_Context
+!define ADMIN_COLOR #FFE4CC
+!define USER_COLOR #CCE5FF
+
+title System Context: Recipe Management System
+
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam shadowing false
+skinparam backgroundColor white
+
+left to right direction
+
+actor "Super Admin" as SuperAdmin #FF6B6B
+actor "Admin" as Admin #FFA500
+actor "User" as User #4ECDC4
+actor "Guest" as Guest #95A5A6
+
+rectangle "Recipe Management System" {
+  
+  package "Admin Subsystem" #FFE4CC {
+    rectangle "User Management" as UC_A1
+    rectangle "Recipe Management" as UC_A2
+    rectangle "Category & Ingredient\nManagement" as UC_A3
+    rectangle "Admin Account\nManagement" as UC_A4
+    rectangle "Analytics & Reporting" as UC_A5
+  }
+  
+  package "User Subsystem" #CCE5FF {
+    rectangle "Authentication &\nProfile" as UC_1
+    rectangle "Recipe Discovery" as UC_2
+    rectangle "Personal Recipe\nManagement" as UC_3
+    rectangle "Social Interaction" as UC_4
+    rectangle "Virtual Fridge" as UC_5
+    rectangle "Meal Planning" as UC_6
+  }
+}
+
+' Actor connections
+SuperAdmin --> UC_A1
+SuperAdmin --> UC_A2
+SuperAdmin --> UC_A3
+SuperAdmin --> UC_A4
+SuperAdmin --> UC_A5
+
+Admin --> UC_A1
+Admin --> UC_A2
+Admin --> UC_A3
+Admin --> UC_A5
+
+User --> UC_1
+User --> UC_2
+User --> UC_3
+User --> UC_4
+User --> UC_5
+User --> UC_6
+
+Guest --> UC_2
+Guest --> UC_4
+
+note right of SuperAdmin
+  Full system access
+  Manage admin accounts
+  Assign permissions
+end note
+
+note right of Admin
+  Manage content
+  Moderate recipes
+  View analytics
+end note
+
+note left of User
+  Create recipes
+  Social features
+  Personal planning
+end note
+
+note left of Guest
+  View recipes
+  Browse content
+  Limited access
+end note
+
+@enduml

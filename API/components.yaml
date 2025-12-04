@@ -1,0 +1,1854 @@
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from login endpoint
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Page number (starts from 1)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+        example: 1
+    LimitParam:
+      name: limit
+      in: query
+      description: Number of items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+        example: 20
+    UserIdParam:
+      name: userId
+      in: path
+      required: true
+      description: User UUID identifier
+      schema:
+        type: string
+        format: uuid
+        example: 123e4567-e89b-12d3-a456-426614174000
+    RecipeIdParam:
+      name: recipeId
+      in: path
+      required: true
+      description: Recipe UUID identifier
+      schema:
+        type: string
+        format: uuid
+        example: 987fcdeb-51d2-43a1-b234-567890123456
+    CollectionIdParam:
+      name: collectionId
+      in: path
+      required: true
+      description: Collection UUID identifier
+      schema:
+        type: string
+        format: uuid
+        example: 456e7890-a12b-34c5-d678-901234567890
+    MealPlanIdParam:
+      name: mealPlanId
+      in: path
+      required: true
+      description: Meal Plan UUID identifier
+      schema:
+        type: string
+        format: uuid
+        example: 789a0123-b45c-67d8-e901-234567890123
+    StatusParam:
+      name: status
+      in: query
+      description: Filter by status
+      schema:
+        type: string
+        enum:
+          - ACTIVE
+          - LOCKED
+          - PENDING
+          - VERIFIED
+        example: ACTIVE
+    RecipeStatusParam:
+      name: status
+      in: query
+      description: Filter by recipe status
+      schema:
+        type: string
+        enum:
+          - DRAFT
+          - PENDING
+          - APPROVED
+          - REJECTED
+          - ARCHIVED
+        example: APPROVED
+    DifficultyParam:
+      name: difficulty
+      in: query
+      description: Filter by recipe difficulty
+      schema:
+        type: string
+        enum:
+          - EASY
+          - MEDIUM
+          - HARD
+        example: MEDIUM
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: User unique identifier
+          example: 123e4567-e89b-12d3-a456-426614174000
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: user@example.com
+        phone:
+          type:
+            - string
+            - "null"
+          pattern: ^[0-9]{10,11}$
+          description: Phone number (optional)
+          example: "0912345678"
+        displayName:
+          type: string
+          minLength: 2
+          maxLength: 100
+          description: User display name
+          example: Nguyễn Văn A
+        avatarUrl:
+          type:
+            - string
+            - "null"
+          format: uri
+          description: Profile avatar URL
+          example: https://example.com/avatars/user123.jpg
+        status:
+          type: string
+          enum:
+            - PENDING
+            - VERIFIED
+            - LOCKED
+          description: Account status
+          example: VERIFIED
+        createdAt:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+          example: 2024-01-15T10:30:00Z
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: 2024-01-20T15:45:00Z
+        lastLoginAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: Last login timestamp
+          example: 2024-01-20T08:15:00Z
+      required:
+        - id
+        - email
+        - displayName
+        - status
+        - createdAt
+        - updatedAt
+    UserProfile:
+      allOf:
+        - $ref: "#/components/schemas/User"
+        - type: object
+          properties:
+            bio:
+              type:
+                - string
+                - "null"
+              maxLength: 500
+              description: User biography
+              example: Passionate home cook and recipe creator
+            preferences:
+              type: object
+              properties:
+                dietaryRestrictions:
+                  type: array
+                  items:
+                    type: string
+                  description: Dietary restrictions and allergies
+                  example:
+                    - vegetarian
+                    - gluten-free
+                favoriteCategories:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: Favorite recipe categories
+                  example:
+                    - 123e4567-e89b-12d3-a456-426614174001
+            stats:
+              $ref: "#/components/schemas/UserStats"
+    UserStats:
+      type: object
+      properties:
+        recipesCount:
+          type: integer
+          minimum: 0
+          description: Total number of recipes created
+          example: 25
+        favoritesCount:
+          type: integer
+          minimum: 0
+          description: Total number of favorite recipes
+          example: 150
+        ratingsGivenCount:
+          type: integer
+          minimum: 0
+          description: Total ratings given by user
+          example: 78
+        commentsCount:
+          type: integer
+          minimum: 0
+          description: Total comments made
+          example: 42
+    UserSession:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        token:
+          type: string
+          description: Session token
+        expiresAt:
+          type: string
+          format: date-time
+        ipAddress:
+          type:
+            - string
+            - "null"
+          description: Client IP address
+        userAgent:
+          type:
+            - string
+            - "null"
+          description: Client user agent
+        createdAt:
+          type: string
+          format: date-time
+        lastAccessedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        isActive:
+          type: boolean
+          default: true
+      required:
+        - id
+        - userId
+        - token
+        - expiresAt
+        - createdAt
+        - isActive
+    Recipe:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Recipe unique identifier
+          example: 987fcdeb-51d2-43a1-b234-567890123456
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Recipe name
+          example: Thịt Kho Tàu Truyền Thống
+        description:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: Recipe description
+          example: Món thịt kho tàu đậm đà hương vị truyền thống
+        thumbnailUrl:
+          type:
+            - string
+            - "null"
+          format: uri
+          description: Recipe thumbnail image URL
+          example: https://example.com/recipes/thit-kho-tau.jpg
+        prepTime:
+          type: integer
+          minimum: 0
+          description: Preparation time in minutes
+          example: 30
+        cookTime:
+          type: integer
+          minimum: 0
+          description: Cooking time in minutes
+          example: 90
+        difficulty:
+          type: string
+          enum:
+            - EASY
+            - MEDIUM
+            - HARD
+          description: Recipe difficulty level
+          example: MEDIUM
+        servings:
+          type: integer
+          minimum: 1
+          description: Number of servings
+          example: 4
+        status:
+          type: string
+          enum:
+            - DRAFT
+            - PENDING
+            - APPROVED
+            - REJECTED
+            - ARCHIVED
+          description: Recipe approval status
+          example: APPROVED
+        isPublic:
+          type: boolean
+          description: Whether recipe is publicly visible
+          default: true
+        createdBy:
+          type: string
+          format: uuid
+          description: Recipe author user ID
+          example: 123e4567-e89b-12d3-a456-426614174000
+        createdAt:
+          type: string
+          format: date-time
+          example: 2024-01-15T10:30:00Z
+        updatedAt:
+          type: string
+          format: date-time
+          example: 2024-01-20T15:45:00Z
+        views:
+          type: integer
+          minimum: 0
+          description: Number of views
+          example: 1250
+        isDeleted:
+          type: boolean
+          default: false
+        avgRating:
+          type:
+            - number
+            - "null"
+          format: float
+          minimum: 0
+          maximum: 5
+          description: Average rating score
+          example: 4.5
+        ratingCount:
+          type: integer
+          minimum: 0
+          description: Total number of ratings
+          example: 89
+        favoriteCount:
+          type: integer
+          minimum: 0
+          description: Number of users who favorited this recipe
+          example: 234
+      required:
+        - id
+        - name
+        - description
+        - prepTime
+        - cookTime
+        - difficulty
+        - servings
+        - status
+        - createdBy
+        - createdAt
+        - updatedAt
+        - views
+        - isDeleted
+    RecipeDetail:
+      allOf:
+        - $ref: "#/components/schemas/Recipe"
+        - type: object
+          properties:
+            ingredients:
+              type: array
+              items:
+                $ref: "#/components/schemas/Ingredient"
+              description: List of ingredients
+            steps:
+              type: array
+              items:
+                $ref: "#/components/schemas/RecipeStep"
+              description: Cooking steps
+            media:
+              type: array
+              items:
+                $ref: "#/components/schemas/RecipeMedia"
+              description: Associated media files
+            nutritionalInfo:
+              $ref: "#/components/schemas/NutritionalInfo"
+            tags:
+              type: array
+              items:
+                type: string
+              description: Recipe tags
+              example:
+                - Vietnamese
+                - Traditional
+                - Braised
+            author:
+              $ref: "#/components/schemas/User"
+    Ingredient:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        recipeId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Ingredient name
+          example: Thịt heo ba chỉ
+        amount:
+          type: number
+          format: float
+          minimum: 0
+          description: Ingredient amount
+          example: 500
+        unit:
+          type: string
+          minLength: 1
+          maxLength: 20
+          description: Measurement unit
+          example: gram
+        notes:
+          type:
+            - string
+            - "null"
+          maxLength: 500
+          description: Additional notes
+          example: Chọn miếng có vân mỡ đều
+        orderIndex:
+          type: integer
+          minimum: 0
+          description: Display order
+          example: 1
+      required:
+        - id
+        - recipeId
+        - name
+        - amount
+        - unit
+        - orderIndex
+    RecipeStep:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        recipeId:
+          type: string
+          format: uuid
+        stepNumber:
+          type: integer
+          minimum: 1
+          description: Step sequence number
+          example: 1
+        instruction:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Step instruction
+          example: Rửa sạch thịt, cắt miếng vừa ăn
+        duration:
+          type:
+            - integer
+            - "null"
+          minimum: 0
+          description: Estimated duration in minutes
+          example: 15
+      required:
+        - id
+        - recipeId
+        - stepNumber
+        - instruction
+    RecipeMedia:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        recipeId:
+          type: string
+          format: uuid
+        stepId:
+          type:
+            - string
+            - "null"
+          format: uuid
+          description: Associated step ID (nullable for recipe-level media)
+        fileUrl:
+          type: string
+          format: uri
+          description: Media file URL
+          example: https://example.com/media/recipe-step-1.jpg
+        fileType:
+          type: string
+          enum:
+            - IMAGE
+            - VIDEO
+          description: File type
+          example: IMAGE
+        fileSize:
+          type: integer
+          minimum: 1
+          description: File size in bytes
+          example: 1048576
+        fileName:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Original file name
+          example: thit-kho-step1.jpg
+        uploadedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - recipeId
+        - fileUrl
+        - fileType
+        - fileSize
+        - fileName
+        - uploadedAt
+    NutritionalInfo:
+      type: object
+      properties:
+        calories:
+          type:
+            - number
+            - "null"
+          format: float
+          minimum: 0
+          example: 320.5
+        protein:
+          type:
+            - number
+            - "null"
+          format: float
+          minimum: 0
+          example: 25.2
+        carbs:
+          type:
+            - number
+            - "null"
+          format: float
+          minimum: 0
+          example: 15.8
+        fat:
+          type:
+            - number
+            - "null"
+          format: float
+          minimum: 0
+          example: 18.3
+        fiber:
+          type:
+            - number
+            - "null"
+          format: float
+          minimum: 0
+          example: 3.1
+        sugar:
+          type:
+            - number
+            - "null"
+          format: float
+          minimum: 0
+          example: 8.5
+    Favorite:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        recipeId:
+          type: string
+          format: uuid
+        addedAt:
+          type: string
+          format: date-time
+          example: 2024-01-15T10:30:00Z
+      required:
+        - id
+        - userId
+        - recipeId
+        - addedAt
+    Rating:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        recipeId:
+          type: string
+          format: uuid
+        score:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Rating score from 1 to 5 stars
+          example: 4
+        comment:
+          type:
+            - string
+            - "null"
+          maxLength: 1000
+          description: Optional rating comment
+          example: Công thức rất hay, gia đình tôi rất thích!
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+      required:
+        - id
+        - userId
+        - recipeId
+        - score
+        - createdAt
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        recipeId:
+          type: string
+          format: uuid
+        content:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Comment content
+          example: Tôi đã thử làm theo công thức này và rất thành công!
+        photos:
+          type:
+            - array
+            - "null"
+          items:
+            type: string
+            format: uri
+          description: Attached photo URLs
+          example:
+            - https://example.com/comments/photo1.jpg
+        tags:
+          type:
+            - array
+            - "null"
+          items:
+            type: string
+          description: Quick rating tags
+          example:
+            - delicious
+            - easy-to-follow
+        helpfulCount:
+          type: integer
+          minimum: 0
+          description: Number of "helpful" votes
+          default: 0
+          example: 12
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        isDeleted:
+          type: boolean
+          default: false
+      required:
+        - id
+        - userId
+        - recipeId
+        - content
+        - helpfulCount
+        - createdAt
+        - isDeleted
+    ShareRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        recipeId:
+          type: string
+          format: uuid
+        userId:
+          type:
+            - string
+            - "null"
+          format: uuid
+          description: User who shared (nullable for anonymous shares)
+        channel:
+          type: string
+          enum:
+            - FACEBOOK
+            - INSTAGRAM
+            - TWITTER
+            - WHATSAPP
+            - EMAIL
+            - COPY_LINK
+            - QR_CODE
+          description: Sharing channel
+          example: FACEBOOK
+        sharedAt:
+          type: string
+          format: date-time
+        ipAddress:
+          type:
+            - string
+            - "null"
+          description: IP address for anonymous shares
+          example: 192.168.1.1
+      required:
+        - id
+        - recipeId
+        - channel
+        - sharedAt
+    Collection:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Collection name
+          example: Món Chay Yêu Thích
+        description:
+          type:
+            - string
+            - "null"
+          maxLength: 500
+          description: Collection description
+          example: Tuyển tập các món chay ngon và bổ dưỡng
+        thumbnailUrl:
+          type:
+            - string
+            - "null"
+          format: uri
+          description: Collection thumbnail
+        isPublic:
+          type: boolean
+          description: Whether collection is publicly visible
+          default: false
+        userId:
+          type: string
+          format: uuid
+          description: Collection owner
+        recipesCount:
+          type: integer
+          minimum: 0
+          description: Number of recipes in collection
+          example: 15
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - isPublic
+        - userId
+        - recipesCount
+        - createdAt
+        - updatedAt
+    MealPlan:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date
+          description: Meal plan date
+          example: 2024-01-15
+        meals:
+          type: array
+          items:
+            $ref: "#/components/schemas/MealPlanEntry"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - date
+        - meals
+        - createdAt
+        - updatedAt
+    MealPlanEntry:
+      type: object
+      properties:
+        mealType:
+          type: string
+          enum:
+            - BREAKFAST
+            - LUNCH
+            - DINNER
+            - SNACK
+          description: Type of meal
+          example: LUNCH
+        recipeId:
+          type: string
+          format: uuid
+        recipe:
+          $ref: "#/components/schemas/Recipe"
+        servings:
+          type: integer
+          minimum: 1
+          description: Number of servings planned
+          example: 2
+        notes:
+          type:
+            - string
+            - "null"
+          maxLength: 500
+          description: Meal planning notes
+          example: Chuẩn bị trước cho cả tuần
+      required:
+        - mealType
+        - recipeId
+        - servings
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Category name
+          example: Món Chính
+        description:
+          type:
+            - string
+            - "null"
+          maxLength: 500
+          example: Các món ăn chính trong bữa cơm
+        image:
+          type:
+            - string
+            - "null"
+          format: uri
+        parentId:
+          type:
+            - string
+            - "null"
+          format: uuid
+          description: Parent category ID for hierarchical structure
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+        recipesCount:
+          type: integer
+          minimum: 0
+          description: Number of recipes in this category
+          example: 156
+      required:
+        - id
+        - name
+        - recipesCount
+    SystemIngredient:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Standardized ingredient name
+          example: Thịt heo ba chỉ
+        category:
+          type:
+            - string
+            - "null"
+          description: Ingredient category
+          example: Thịt
+        unit:
+          type: string
+          description: Standard measurement unit
+          example: gram
+        nutritionalInfo:
+          $ref: "#/components/schemas/NutritionalInfo"
+      required:
+        - id
+        - name
+        - unit
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          enum:
+            - USER_LOCK
+            - USER_UNLOCK
+            - USER_VIEW
+            - RECIPE_APPROVE
+            - RECIPE_REJECT
+            - ADMIN_CREATE
+            - ADMIN_DELETE
+          description: Action performed
+          example: USER_LOCK
+        actorId:
+          type: string
+          format: uuid
+          description: Admin who performed the action
+        targetId:
+          type: string
+          format: uuid
+          description: Target user/entity ID
+        details:
+          type:
+            - object
+            - "null"
+          description: Additional action details
+          example:
+            reason: Spam content
+            duration: "30"
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - id
+        - action
+        - actorId
+        - targetId
+        - timestamp
+    UserActivity:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        activityType:
+          type: string
+          enum:
+            - RECIPE_CREATE
+            - RECIPE_UPDATE
+            - COMMENT_POST
+            - RATING_GIVE
+            - LOGIN
+            - LOGOUT
+          example: RECIPE_CREATE
+        entityType:
+          type:
+            - string
+            - "null"
+          example: RECIPE
+        entityId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        metadata:
+          type:
+            - object
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - activityType
+        - createdAt
+    AdminAccount:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 100
+        role:
+          type: string
+          enum:
+            - ADMIN
+            - MODERATOR
+            - SUPER_ADMIN
+          example: ADMIN
+        permissions:
+          type: array
+          items:
+            type: string
+          description: List of permissions
+          example:
+            - user:read
+            - user:update
+            - recipe:approve
+        createdAt:
+          type: string
+          format: date-time
+        lastLogin:
+          type:
+            - string
+            - "null"
+          format: date-time
+        isActive:
+          type: boolean
+          default: true
+      required:
+        - id
+        - email
+        - fullName
+        - role
+        - permissions
+        - createdAt
+        - isActive
+    AnalyticsResponse:
+      type: object
+      properties:
+        summary:
+          type: object
+          properties:
+            totalUsers:
+              type: integer
+              example: 15420
+            activeUsers:
+              type: integer
+              example: 8960
+            totalRecipes:
+              type: integer
+              example: 45200
+            approvedRecipes:
+              type: integer
+              example: 42180
+            totalRatings:
+              type: integer
+              example: 125600
+        chartData:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              value:
+                type: number
+              label:
+                type: string
+        topItems:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+              count:
+                type: integer
+              percentage:
+                type: number
+                format: float
+      required:
+        - summary
+        - chartData
+        - topItems
+    UserRegistrationRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          description: Password (at least 8 characters)
+        confirmPassword:
+          type: string
+          minLength: 8
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 100
+        phone:
+          type:
+            - string
+            - "null"
+          pattern: ^[0-9]{10,11}$
+      required:
+        - email
+        - password
+        - confirmPassword
+        - fullName
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+        - email
+        - password
+    UpdateProfileRequest:
+      type: object
+      properties:
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 100
+        phone:
+          type:
+            - string
+            - "null"
+          pattern: ^[0-9]{10,11}$
+        bio:
+          type:
+            - string
+            - "null"
+          maxLength: 500
+        avatarUrl:
+          type:
+            - string
+            - "null"
+          format: uri
+        preferences:
+          type: object
+          properties:
+            dietaryRestrictions:
+              type: array
+              items:
+                type: string
+            favoriteCategories:
+              type: array
+              items:
+                type: string
+                format: uuid
+    ChangePasswordRequest:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
+        confirmNewPassword:
+          type: string
+          minLength: 8
+      required:
+        - currentPassword
+        - newPassword
+        - confirmNewPassword
+    CreateRecipeRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        categoryId:
+          type: string
+          format: uuid
+        difficulty:
+          type: string
+          enum:
+            - EASY
+            - MEDIUM
+            - HARD
+        servings:
+          type: integer
+          minimum: 1
+        prepTime:
+          type: integer
+          minimum: 0
+        cookTime:
+          type: integer
+          minimum: 0
+        ingredients:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                minLength: 1
+                maxLength: 100
+              amount:
+                type: number
+                format: float
+                minimum: 0
+              unit:
+                type: string
+                minLength: 1
+                maxLength: 20
+              notes:
+                type:
+                  - string
+                  - "null"
+                maxLength: 500
+              orderIndex:
+                type: integer
+                minimum: 0
+            required:
+              - name
+              - amount
+              - unit
+              - orderIndex
+        steps:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            properties:
+              stepNumber:
+                type: integer
+                minimum: 1
+              instruction:
+                type: string
+                minLength: 1
+                maxLength: 1000
+              duration:
+                type:
+                  - integer
+                  - "null"
+                minimum: 0
+            required:
+              - stepNumber
+              - instruction
+        tags:
+          type: array
+          items:
+            type: string
+        nutritionalInfo:
+          $ref: "#/components/schemas/NutritionalInfo"
+        isPublic:
+          type: boolean
+          default: true
+      required:
+        - name
+        - description
+        - categoryId
+        - difficulty
+        - servings
+        - prepTime
+        - cookTime
+        - ingredients
+        - steps
+    AISuggestionRequest:
+      type: object
+      properties:
+        ingredients:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          description: Available ingredients
+          example:
+            - thịt bò
+            - khoai tây
+            - cà rốt
+        preferences:
+          type: object
+          properties:
+            difficulty:
+              type: string
+              enum:
+                - EASY
+                - MEDIUM
+                - HARD
+            cookingTime:
+              type: integer
+              minimum: 1
+              description: Maximum cooking time in minutes
+            category:
+              type: string
+            dietaryRestrictions:
+              type: array
+              items:
+                type: string
+      required:
+        - ingredients
+    RatingRequest:
+      type: object
+      properties:
+        score:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type:
+            - string
+            - "null"
+          maxLength: 1000
+      required:
+        - score
+    CommentRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        photos:
+          type:
+            - array
+            - "null"
+          items:
+            type: string
+            format: uri
+        tags:
+          type:
+            - array
+            - "null"
+          items:
+            type: string
+      required:
+        - content
+    CreateCollectionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type:
+            - string
+            - "null"
+          maxLength: 500
+        isPublic:
+          type: boolean
+          default: false
+        thumbnailUrl:
+          type:
+            - string
+            - "null"
+          format: uri
+      required:
+        - name
+    CreateMealPlanRequest:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        meals:
+          type: array
+          items:
+            type: object
+            properties:
+              mealType:
+                type: string
+                enum:
+                  - BREAKFAST
+                  - LUNCH
+                  - DINNER
+                  - SNACK
+              recipeId:
+                type: string
+                format: uuid
+              servings:
+                type: integer
+                minimum: 1
+              notes:
+                type:
+                  - string
+                  - "null"
+                maxLength: 500
+            required:
+              - mealType
+              - recipeId
+              - servings
+      required:
+        - date
+        - meals
+    DeactivateUserRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 500
+        duration:
+          type:
+            - integer
+            - "null"
+          minimum: 1
+          description: Lock duration in days (null for permanent)
+      required:
+        - reason
+    CreateAdminRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 100
+        role:
+          type: string
+          enum:
+            - ADMIN
+            - MODERATOR
+        password:
+          type: string
+          minLength: 8
+        permissions:
+          type: array
+          items:
+            type: string
+      required:
+        - email
+        - fullName
+        - role
+        - password
+        - permissions
+    CreateCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type:
+            - string
+            - "null"
+          maxLength: 500
+        parentId:
+          type:
+            - string
+            - "null"
+          format: uuid
+        image:
+          type:
+            - string
+            - "null"
+          format: uri
+      required:
+        - name
+    CreateIngredientRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        category:
+          type:
+            - string
+            - "null"
+        unit:
+          type: string
+          minLength: 1
+          maxLength: 20
+        nutritionalInfo:
+          $ref: "#/components/schemas/NutritionalInfo"
+      required:
+        - name
+        - unit
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0
+        hasNext:
+          type: boolean
+        hasPrevious:
+          type: boolean
+      required:
+        - page
+        - limit
+        - total
+        - totalPages
+        - hasNext
+        - hasPrevious
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Operation completed successfully
+        data:
+          type:
+            - object
+            - "null"
+      required:
+        - success
+        - message
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            user:
+              $ref: "#/components/schemas/User"
+            token:
+              type: string
+              description: JWT access token
+            refreshToken:
+              type: string
+              description: Refresh token
+            expiresIn:
+              type: integer
+              description: Token expiration time in seconds
+      required:
+        - success
+        - data
+    UserListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            users:
+              type: array
+              items:
+                $ref: "#/components/schemas/User"
+            pagination:
+              $ref: "#/components/schemas/Pagination"
+      required:
+        - success
+        - data
+    RecipeListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            recipes:
+              type: array
+              items:
+                $ref: "#/components/schemas/Recipe"
+            pagination:
+              $ref: "#/components/schemas/Pagination"
+      required:
+        - success
+        - data
+    CollectionListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            collections:
+              type: array
+              items:
+                $ref: "#/components/schemas/Collection"
+            pagination:
+              $ref: "#/components/schemas/Pagination"
+      required:
+        - success
+        - data
+    MealPlanResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: "#/components/schemas/MealPlan"
+      required:
+        - success
+        - data
+    MealPlanListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            mealPlans:
+              type: array
+              items:
+                $ref: "#/components/schemas/MealPlan"
+            pagination:
+              $ref: "#/components/schemas/Pagination"
+      required:
+        - success
+        - data
+    CategoryListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            categories:
+              type: array
+              items:
+                $ref: "#/components/schemas/Category"
+            pagination:
+              $ref: "#/components/schemas/Pagination"
+      required:
+        - success
+        - data
+    IngredientListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            ingredients:
+              type: array
+              items:
+                $ref: "#/components/schemas/SystemIngredient"
+            pagination:
+              $ref: "#/components/schemas/Pagination"
+      required:
+        - success
+        - data
+    AdminAccountListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            accounts:
+              type: array
+              items:
+                $ref: "#/components/schemas/AdminAccount"
+            pagination:
+              $ref: "#/components/schemas/Pagination"
+      required:
+        - success
+        - data
+    AuditLogListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            logs:
+              type: array
+              items:
+                $ref: "#/components/schemas/AuditLog"
+            pagination:
+              $ref: "#/components/schemas/Pagination"
+      required:
+        - success
+        - data
+    UserActivityListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            activities:
+              type: array
+              items:
+                $ref: "#/components/schemas/UserActivity"
+            pagination:
+              $ref: "#/components/schemas/Pagination"
+      required:
+        - success
+        - data
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Invalid input data
+            details:
+              type:
+                - object
+                - "null"
+              example:
+                field: email
+                issue: Invalid email format
+      required:
+        - success
+        - error
+  responses:
+    BadRequest:
+      description: Bad Request - Invalid input data
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: BAD_REQUEST
+              message: Invalid input data
+    Unauthorized:
+      description: Unauthorized - Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: UNAUTHORIZED
+              message: Authentication token required
+    Forbidden:
+      description: Forbidden - Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: FORBIDDEN
+              message: Insufficient permissions for this operation
+    NotFound:
+      description: Not Found - Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: NOT_FOUND
+              message: The requested resource was not found
+    Conflict:
+      description: Conflict - Resource already exists
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: CONFLICT
+              message: Resource already exists
+    InternalServerError:
+      description: Internal Server Error - Unexpected error occurred
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: INTERNAL_SERVER_ERROR
+              message: An unexpected error occurred

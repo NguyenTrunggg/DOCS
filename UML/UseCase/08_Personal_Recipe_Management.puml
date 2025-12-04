@@ -1,0 +1,75 @@
+@startuml Personal_Recipe_Management
+title Use Case Diagram: Personal Recipe Management (UC3)
+
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam shadowing false
+skinparam backgroundColor white
+
+left to right direction
+
+actor "User" as User #4ECDC4
+
+rectangle "Personal Recipe Management System" {
+  usecase "UCS03-1\nCreate Recipe" as UC1 #FFE4B5
+  usecase "UCS03-2\nView My Recipes" as UC2 #E0F0FF
+  usecase "UCS03-3\nUpdate My Recipe" as UC3 #FFE4B5
+  usecase "UCS03-4\nDelete My Recipe" as UC4 #E0F0FF
+}
+
+User --> UC1
+User --> UC2
+User --> UC3
+User --> UC4
+
+' Relationships
+UC3 ..> UC2 : <<include>>
+UC4 ..> UC2 : <<include>>
+UC1 ..> UC2 : <<extend>>
+
+note right of UC1
+  Create in "Pending" status
+  Full form: name, description, image,
+  category, time, difficulty, ingredients, steps
+  Import from AI generation
+  Clone from other recipes
+  10 recipes/day limit
+end note
+
+note right of UC2
+  View all my recipes
+  Filter by status:
+  - Pending
+  - Approved
+  - Rejected
+  Search and filter
+  Statistics overview
+end note
+
+note right of UC3
+  Edit when status is:
+  - Pending
+  - Rejected
+  - Draft
+  Rejected → Pending
+  Keep original layout
+  Same as create form
+end note
+
+note right of UC4
+  Simple confirmation for pending
+  Special confirmation (type name)
+  for high-interaction recipes
+  Show impact warning
+end note
+
+note bottom of UC2
+  Recipe Status Workflow:
+  Draft → Pending → Approved/Rejected
+end note
+
+@enduml
+
+
+
+

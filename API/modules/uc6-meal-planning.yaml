@@ -1,0 +1,1368 @@
+paths:
+  /meal-plans:
+    get:
+      tags:
+        - Meal Planning
+      summary: UCS06-1 - Get user's meal plans
+      description: |
+        Get meal plans for current user with date range filtering.
+        Returns organized meal plans by date with meal entries.
+
+        **Business Rules:**
+        - Shows only meal plans owned by current user
+        - Default shows current week if no date filter specified
+        - Supports date range queries (single date, week, month)
+        - Includes recipe information and serving calculations
+
+        **ERD Entities:** MEAL_PLAN, MEAL_PLAN_ENTRY, RECIPE
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          description: Start date for meal plan range (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+          example: 2024-01-15
+        - name: endDate
+          in: query
+          description: End date for meal plan range (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+          example: 2024-01-21
+        - name: date
+          in: query
+          description: Single date for meal plan (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+          example: 2024-01-15
+        - name: includeRecipes
+          in: query
+          description: Include full recipe information
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: Meal plans retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/MealPlanResponse
+              example:
+                success: true
+                data:
+                  mealPlans:
+                    - id: mp-123e4567-e89b-12d3-a456-426614174000
+                      userId: 123e4567-e89b-12d3-a456-426614174000
+                      date: 2024-01-15
+                      meals:
+                        - mealType: BREAKFAST
+                          recipeId: rec1
+                          servings: 2
+                          notes: Ăn sáng nhẹ nhàng
+                          recipe:
+                            id: rec1
+                            name: Cháo gà
+                        - mealType: LUNCH
+                          recipeId: rec2
+                          servings: 4
+                          recipe:
+                            id: rec2
+                            name: Cơm gà Hải Nam
+                      createdAt: 2024-01-14T10:00:00Z
+                      updatedAt: 2024-01-14T15:30:00Z
+        "400":
+          description: Invalid date parameters
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              example:
+                success: false
+                error:
+                  code: INVALID_DATE_RANGE
+                  message: End date must be after start date
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+      operationId: getMealPlans
+    post:
+      tags:
+        - Meal Planning
+      summary: UCS06-2 - Create meal plan
+      description: |
+        Create a new meal plan for a specific date.
+        Can create meal plan with multiple meals for different meal types.
+
+        **Business Rules:**
+        - User must be authenticated
+        - Date cannot be in the past (more than 1 day ago)
+        - Each meal type can only appear once per date
+        - Recipes must be APPROVED status
+        - Serving calculations based on recipe default servings
+
+        **ERD Entities:** MEAL_PLAN, MEAL_PLAN_ENTRY
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../components.yaml#/components/schemas/CreateMealPlanRequest
+            example:
+              date: 2024-01-16
+              meals:
+                - mealType: BREAKFAST
+                  recipeId: 987fcdeb-51d2-43a1-b234-567890123456
+                  servings: 2
+                  notes: Ăn sáng dinh dưỡng
+                - mealType: LUNCH
+                  recipeId: 456e7890-a12b-34c5-d678-901234567890
+                  servings: 4
+                - mealType: DINNER
+                  recipeId: 789a0123-b45c-67d8-e901-234567890123
+                  servings: 3
+                  notes: Bữa tối gia đình
+      responses:
+        "201":
+          description: Meal plan created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: ../components.yaml#/components/schemas/MealPlan
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              examples:
+                date_in_past:
+                  summary: Date in the past
+                  value:
+                    success: false
+                    error:
+                      code: INVALID_DATE
+                      message: Cannot create meal plan for past dates
+                      details:
+                        date: 2024-01-10
+                        today: 2024-01-15
+                duplicate_meal_type:
+                  summary: Duplicate meal type
+                  value:
+                    success: false
+                    error:
+                      code: DUPLICATE_MEAL_TYPE
+                      message: Each meal type can only appear once per day
+                      details:
+                        duplicateType: BREAKFAST
+                recipe_not_found:
+                  summary: Recipe not found or not approved
+                  value:
+                    success: false
+                    error:
+                      code: RECIPE_NOT_AVAILABLE
+                      message: One or more recipes are not available for meal planning
+                      details:
+                        unavailableRecipes:
+                          - 456e7890-a12b-34c5-d678-901234567890
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "409":
+          description: Meal plan already exists for date
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              example:
+                success: false
+                error:
+                  code: MEAL_PLAN_EXISTS
+                  message: Meal plan already exists for this date
+                  details:
+                    existingPlanId: mp-456e7890-a12b-34c5-d678-901234567890
+      operationId: createMealPlans
+  /meal-plans/{mealPlanId}:
+    get:
+      tags:
+        - Meal Planning
+      summary: Get meal plan details
+      description: |
+        Get detailed information about a specific meal plan.
+        Includes full recipe information and nutritional summary.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/MealPlanIdParam
+        - name: includeNutrition
+          in: query
+          description: Include nutritional information summary
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Meal plan details retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    allOf:
+                      - $ref: ../components.yaml#/components/schemas/MealPlan
+                      - type: object
+                        properties:
+                          nutritionalSummary:
+                            type: object
+                            properties:
+                              totalCalories:
+                                type: number
+                                format: float
+                                example: 2150.5
+                              totalProtein:
+                                type: number
+                                format: float
+                                example: 95.2
+                              totalCarbs:
+                                type: number
+                                format: float
+                                example: 280.8
+                              totalFat:
+                                type: number
+                                format: float
+                                example: 78.4
+                              byMealType:
+                                type: object
+                                additionalProperties:
+                                  $ref: ../components.yaml#/components/schemas/NutritionalInfo
+                            description: Nutritional summary (if includeNutrition=true)
+                          canEdit:
+                            type: boolean
+                            description: Whether current user can edit this meal plan
+                          canDelete:
+                            type: boolean
+                            description: Whether current user can delete this meal plan
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: getMealPlansByid
+    put:
+      tags:
+        - Meal Planning
+      summary: UCS06-3 - Update meal plan
+      description: |
+        Update existing meal plan by adding, removing, or modifying meals.
+        Only meal plan owner can update.
+
+        **Business Rules:**
+        - Only owner can update meal plan
+        - Cannot update meal plans for past dates (more than 1 day ago)
+        - Can add new meals or update existing ones
+        - Can change servings or notes for existing meals
+
+        **ERD Entities:** MEAL_PLAN, MEAL_PLAN_ENTRY
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/MealPlanIdParam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                meals:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      mealType:
+                        type: string
+                        enum:
+                          - BREAKFAST
+                          - LUNCH
+                          - DINNER
+                          - SNACK
+                      recipeId:
+                        type: string
+                        format: uuid
+                      servings:
+                        type: integer
+                        minimum: 1
+                      notes:
+                        type:
+                          - string
+                          - "null"
+                        maxLength: 500
+                      action:
+                        type: string
+                        enum:
+                          - ADD
+                          - UPDATE
+                          - REMOVE
+                        default: ADD
+                        description: Action to perform on this meal entry
+                    required:
+                      - mealType
+                      - action
+                notes:
+                  type:
+                    - string
+                    - "null"
+                  maxLength: 1000
+                  description: Overall meal plan notes
+            example:
+              meals:
+                - mealType: BREAKFAST
+                  recipeId: new-recipe-id
+                  servings: 2
+                  action: UPDATE
+                  notes: Thay đổi món ăn sáng
+                - mealType: SNACK
+                  recipeId: snack-recipe-id
+                  servings: 1
+                  action: ADD
+                - mealType: LUNCH
+                  action: REMOVE
+              notes: Kế hoạch ăn uống đã điều chỉnh
+      responses:
+        "200":
+          description: Meal plan updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    allOf:
+                      - $ref: ../components.yaml#/components/schemas/MealPlan
+                      - type: object
+                        properties:
+                          changes:
+                            type: object
+                            properties:
+                              added:
+                                type: integer
+                                example: 1
+                              updated:
+                                type: integer
+                                example: 1
+                              removed:
+                                type: integer
+                                example: 1
+                              summary:
+                                type: array
+                                items:
+                                  type: string
+                                example:
+                                  - Added SNACK meal
+                                  - Updated BREAKFAST meal
+                                  - Removed LUNCH meal
+        "400":
+          $ref: ../components.yaml#/components/responses/BadRequest
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: updateMealPlansByid
+    delete:
+      tags:
+        - Meal Planning
+      summary: UCS06-4 - Delete meal plan
+      description: |
+        Delete entire meal plan for a date.
+        Only meal plan owner can delete.
+
+        **Business Rules:**
+        - Only owner can delete meal plan
+        - Cannot delete meal plans for past dates (more than 1 day ago)
+        - Requires confirmation parameter
+        - Cascade deletes all meal entries
+
+        **ERD Entities:** MEAL_PLAN, MEAL_PLAN_ENTRY
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/MealPlanIdParam
+        - name: confirmDelete
+          in: query
+          required: true
+          description: Confirmation flag (must be true)
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Meal plan deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/SuccessResponse
+              example:
+                success: true
+                message: Meal plan deleted successfully
+        "400":
+          description: Missing confirmation or invalid delete
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              examples:
+                no_confirmation:
+                  summary: Missing delete confirmation
+                  value:
+                    success: false
+                    error:
+                      code: CONFIRMATION_REQUIRED
+                      message: Delete confirmation required (confirmDelete=true)
+                past_date:
+                  summary: Cannot delete past meal plan
+                  value:
+                    success: false
+                    error:
+                      code: CANNOT_DELETE_PAST
+                      message: Cannot delete meal plans for past dates
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: deleteMealPlansByid
+  /meal-plans/weekly:
+    get:
+      tags:
+        - Meal Planning
+      summary: Get weekly meal plan
+      description: |
+        Get meal plans organized by week for easy weekly planning view.
+        Returns 7 days starting from specified date (default: current week).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: weekStartDate
+          in: query
+          description: Start date of week (YYYY-MM-DD), defaults to current week
+          schema:
+            type: string
+            format: date
+          example: 2024-01-15
+        - name: includeNutrition
+          in: query
+          description: Include nutritional summary for the week
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Weekly meal plans retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      weekRange:
+                        type: object
+                        properties:
+                          startDate:
+                            type: string
+                            format: date
+                            example: 2024-01-15
+                          endDate:
+                            type: string
+                            format: date
+                            example: 2024-01-21
+                      dailyPlans:
+                        type: object
+                        additionalProperties:
+                          allOf:
+                            - $ref: ../components.yaml#/components/schemas/MealPlan
+                        description: Meal plans indexed by date (YYYY-MM-DD)
+                        example:
+                          2024-01-15: null
+                          2024-01-16:
+                            id: mp-123
+                            date: 2024-01-16
+                            meals: []
+                      weeklyNutrition:
+                        type: object
+                        properties:
+                          totalCalories:
+                            type: number
+                            format: float
+                          avgDailyCalories:
+                            type: number
+                            format: float
+                          totalProtein:
+                            type: number
+                            format: float
+                          totalCarbs:
+                            type: number
+                            format: float
+                          totalFat:
+                            type: number
+                            format: float
+                        description: Weekly nutritional summary (if includeNutrition=true)
+                      summary:
+                        type: object
+                        properties:
+                          plannedDays:
+                            type: integer
+                            example: 5
+                          totalMeals:
+                            type: integer
+                            example: 15
+                          uniqueRecipes:
+                            type: integer
+                            example: 12
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+      operationId: getMealPlansWeekly
+    post:
+      tags:
+        - Meal Planning
+      summary: Create weekly meal plan
+      description: |
+        Create meal plans for entire week with batch operation.
+        More efficient than creating individual daily plans.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                weekStartDate:
+                  type: string
+                  format: date
+                  description: Start date of week (Monday)
+                dailyPlans:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    properties:
+                      meals:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            mealType:
+                              type: string
+                              enum:
+                                - BREAKFAST
+                                - LUNCH
+                                - DINNER
+                                - SNACK
+                            recipeId:
+                              type: string
+                              format: uuid
+                            servings:
+                              type: integer
+                              minimum: 1
+                            notes:
+                              type:
+                                - string
+                                - "null"
+                              maxLength: 500
+                          required:
+                            - mealType
+                            - recipeId
+                            - servings
+                      notes:
+                        type:
+                          - string
+                          - "null"
+                        maxLength: 500
+                  description: Plans indexed by date offset (0=Monday, 1=Tuesday, etc.)
+              required:
+                - weekStartDate
+                - dailyPlans
+            example:
+              weekStartDate: 2024-01-15
+              dailyPlans:
+                "0":
+                  meals:
+                    - mealType: BREAKFAST
+                      recipeId: rec1
+                      servings: 2
+                    - mealType: LUNCH
+                      recipeId: rec2
+                      servings: 4
+                "1":
+                  meals:
+                    - mealType: BREAKFAST
+                      recipeId: rec3
+                      servings: 2
+      responses:
+        "201":
+          description: Weekly meal plan created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      createdPlans:
+                        type: array
+                        items:
+                          $ref: ../components.yaml#/components/schemas/MealPlan
+                      summary:
+                        type: object
+                        properties:
+                          totalDays:
+                            type: integer
+                            example: 7
+                          plannedDays:
+                            type: integer
+                            example: 5
+                          totalMeals:
+                            type: integer
+                            example: 15
+        "400":
+          $ref: ../components.yaml#/components/responses/BadRequest
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+      operationId: createMealPlansWeekly
+  /meal-plans/{mealPlanId}/shopping-list:
+    get:
+      tags:
+        - Meal Planning
+      summary: UCS06-5 - Generate shopping list from meal plan
+      description: |
+        Generate shopping list from meal plan by aggregating ingredients.
+        Combines ingredients from all recipes in the meal plan with serving adjustments.
+
+        **Business Rules:**
+        - Aggregates ingredients from all recipes in meal plan
+        - Adjusts quantities based on planned servings vs recipe default servings
+        - Groups ingredients by category for organized shopping
+        - Combines same ingredients with different units when possible
+
+        **ERD Entities:** MEAL_PLAN, MEAL_PLAN_ENTRY, RECIPE, INGREDIENT
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/MealPlanIdParam
+        - name: groupBy
+          in: query
+          description: Group ingredients by category or recipe
+          schema:
+            type: string
+            enum:
+              - category
+              - recipe
+              - none
+            default: category
+        - name: includeOptional
+          in: query
+          description: Include optional ingredients (from recipe notes)
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Shopping list generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      mealPlan:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          date:
+                            type: string
+                            format: date
+                          totalMeals:
+                            type: integer
+                      shoppingList:
+                        type: object
+                        properties:
+                          generatedAt:
+                            type: string
+                            format: date-time
+                          totalItems:
+                            type: integer
+                            example: 24
+                          estimatedCost:
+                            type:
+                              - number
+                              - "null"
+                            format: float
+                            description: Estimated cost (if available)
+                          ingredients:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name:
+                                  type: string
+                                  example: Thịt heo ba chỉ
+                                totalAmount:
+                                  type: number
+                                  format: float
+                                  example: 750
+                                unit:
+                                  type: string
+                                  example: gram
+                                category:
+                                  type: string
+                                  example: Thịt
+                                notes:
+                                  type:
+                                    - string
+                                    - "null"
+                                  example: Chọn miếng có vân mỡ đều
+                                fromRecipes:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      recipeId:
+                                        type: string
+                                        format: uuid
+                                      recipeName:
+                                        type: string
+                                      mealType:
+                                        type: string
+                                      amount:
+                                        type: number
+                                        format: float
+                                      servings:
+                                        type: integer
+                                  description: Which recipes contribute to this ingredient
+                                isOptional:
+                                  type: boolean
+                                  default: false
+                                priority:
+                                  type: string
+                                  enum:
+                                    - HIGH
+                                    - MEDIUM
+                                    - LOW
+                                  default: MEDIUM
+                          groupedIngredients:
+                            type: object
+                            additionalProperties:
+                              type: array
+                              items:
+                                type: object
+                            description: Ingredients grouped by category/recipe (if groupBy != none)
+                            example:
+                              Thịt: []
+                              Rau củ: []
+                              Gia vị: []
+              example:
+                success: true
+                data:
+                  shoppingList:
+                    generatedAt: 2024-01-15T10:30:00Z
+                    totalItems: 24
+                    ingredients:
+                      - name: Thịt heo ba chỉ
+                        totalAmount: 750
+                        unit: gram
+                        category: Thịt
+                        fromRecipes:
+                          - recipeId: rec1
+                            recipeName: Thịt kho tàu
+                            mealType: LUNCH
+                            amount: 500
+                            servings: 4
+                          - recipeId: rec2
+                            recipeName: Bún thịt nướng
+                            mealType: DINNER
+                            amount: 250
+                            servings: 2
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: getMealPlansByidShoppingList
+    post:
+      tags:
+        - Meal Planning
+      summary: Generate shopping list from date range
+      description: |
+        Generate shopping list from multiple meal plans within a date range.
+        Useful for weekly or monthly grocery shopping.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/MealPlanIdParam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dateRange:
+                  type: object
+                  properties:
+                    startDate:
+                      type: string
+                      format: date
+                    endDate:
+                      type: string
+                      format: date
+                  required:
+                    - startDate
+                    - endDate
+                options:
+                  type: object
+                  properties:
+                    groupBy:
+                      type: string
+                      enum:
+                        - category
+                        - recipe
+                        - date
+                        - none
+                      default: category
+                    includeOptional:
+                      type: boolean
+                      default: false
+                    combineUnits:
+                      type: boolean
+                      default: true
+                      description: Attempt to combine same ingredients with different units
+                    excludeIngredients:
+                      type: array
+                      items:
+                        type: string
+                      description: Ingredients to exclude (already have at home)
+              required:
+                - dateRange
+      responses:
+        "200":
+          description: Multi-day shopping list generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      dateRange:
+                        type: object
+                        properties:
+                          startDate:
+                            type: string
+                            format: date
+                          endDate:
+                            type: string
+                            format: date
+                          totalDays:
+                            type: integer
+                          plannedDays:
+                            type: integer
+                      consolidatedList:
+                        type: object
+        "400":
+          $ref: ../components.yaml#/components/responses/BadRequest
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+      operationId: createMealPlansByidShoppingList
+  /meal-plans/suggest:
+    post:
+      tags:
+        - Meal Planning
+      summary: Get meal plan suggestions
+      description: |
+        Get AI-powered meal plan suggestions based on preferences and constraints.
+        Helps users create balanced meal plans automatically.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dateRange:
+                  type: object
+                  properties:
+                    startDate:
+                      type: string
+                      format: date
+                    days:
+                      type: integer
+                      minimum: 1
+                      maximum: 30
+                      default: 7
+                  required:
+                    - startDate
+                preferences:
+                  type: object
+                  properties:
+                    dietaryRestrictions:
+                      type: array
+                      items:
+                        type: string
+                      example:
+                        - vegetarian
+                        - gluten-free
+                    favoriteCategories:
+                      type: array
+                      items:
+                        type: string
+                        format: uuid
+                    maxCookTimePerMeal:
+                      type: integer
+                      minimum: 15
+                      example: 60
+                    budgetPerDay:
+                      type:
+                        - number
+                        - "null"
+                      format: float
+                      example: 200000
+                    servings:
+                      type: integer
+                      minimum: 1
+                      default: 2
+                      example: 4
+                constraints:
+                  type: object
+                  properties:
+                    excludeRecipes:
+                      type: array
+                      items:
+                        type: string
+                        format: uuid
+                      description: Recipes to avoid
+                    requiredMealTypes:
+                      type: array
+                      items:
+                        type: string
+                        enum:
+                          - BREAKFAST
+                          - LUNCH
+                          - DINNER
+                          - SNACK
+                      default:
+                        - BREAKFAST
+                        - LUNCH
+                        - DINNER
+                    maxRepeatRecipes:
+                      type: integer
+                      minimum: 0
+                      default: 1
+                      description: How many times same recipe can appear in plan
+              required:
+                - dateRange
+            example:
+              dateRange:
+                startDate: 2024-01-16
+                days: 7
+              preferences:
+                dietaryRestrictions:
+                  - halal
+                maxCookTimePerMeal: 60
+                servings: 4
+              constraints:
+                requiredMealTypes:
+                  - BREAKFAST
+                  - LUNCH
+                  - DINNER
+                maxRepeatRecipes: 1
+      responses:
+        "200":
+          description: Meal plan suggestions generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      suggestions:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            date:
+                              type: string
+                              format: date
+                            meals:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  mealType:
+                                    type: string
+                                    enum:
+                                      - BREAKFAST
+                                      - LUNCH
+                                      - DINNER
+                                      - SNACK
+                                  recipe:
+                                    $ref: ../components.yaml#/components/schemas/Recipe
+                                  suggestedServings:
+                                    type: integer
+                                  matchScore:
+                                    type: number
+                                    format: float
+                                    description: How well recipe matches preferences (0-1)
+                                  reason:
+                                    type: string
+                                    description: Why this recipe was suggested
+                                    example: High protein, matches dietary restrictions
+                      summary:
+                        type: object
+                        properties:
+                          totalMeals:
+                            type: integer
+                          uniqueRecipes:
+                            type: integer
+                          estimatedCost:
+                            type:
+                              - number
+                              - "null"
+                            format: float
+                          nutritionalBalance:
+                            type: object
+                            properties:
+                              score:
+                                type: number
+                                format: float
+                                minimum: 0
+                                maximum: 1
+                              notes:
+                                type: array
+                                items:
+                                  type: string
+        "400":
+          $ref: ../components.yaml#/components/responses/BadRequest
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+      operationId: createMealPlansSuggest
+components:
+  schemas:
+    MealPlanWithNutrition:
+      allOf:
+        - $ref: ../components.yaml#/components/schemas/MealPlan
+        - type: object
+          properties:
+            nutritionalSummary:
+              type: object
+              properties:
+                totalCalories:
+                  type: number
+                  format: float
+                totalProtein:
+                  type: number
+                  format: float
+                totalCarbs:
+                  type: number
+                  format: float
+                totalFat:
+                  type: number
+                  format: float
+                byMealType:
+                  type: object
+                  additionalProperties:
+                    $ref: ../components.yaml#/components/schemas/NutritionalInfo
+    WeeklyMealPlan:
+      type: object
+      properties:
+        weekRange:
+          type: object
+          properties:
+            startDate:
+              type: string
+              format: date
+            endDate:
+              type: string
+              format: date
+        dailyPlans:
+          type: object
+          additionalProperties:
+            $ref: ../components.yaml#/components/schemas/MealPlan
+        weeklyNutrition:
+          type: object
+          properties:
+            totalCalories:
+              type: number
+              format: float
+            avgDailyCalories:
+              type: number
+              format: float
+            totalProtein:
+              type: number
+              format: float
+            totalCarbs:
+              type: number
+              format: float
+            totalFat:
+              type: number
+              format: float
+        summary:
+          type: object
+          properties:
+            plannedDays:
+              type: integer
+            totalMeals:
+              type: integer
+            uniqueRecipes:
+              type: integer
+    ShoppingListItem:
+      type: object
+      properties:
+        name:
+          type: string
+        totalAmount:
+          type: number
+          format: float
+        unit:
+          type: string
+        category:
+          type:
+            - string
+            - "null"
+        notes:
+          type:
+            - string
+            - "null"
+        fromRecipes:
+          type: array
+          items:
+            type: object
+            properties:
+              recipeId:
+                type: string
+                format: uuid
+              recipeName:
+                type: string
+              mealType:
+                type: string
+              amount:
+                type: number
+                format: float
+              servings:
+                type: integer
+        isOptional:
+          type: boolean
+          default: false
+        priority:
+          type: string
+          enum:
+            - HIGH
+            - MEDIUM
+            - LOW
+          default: MEDIUM
+        estimatedCost:
+          type:
+            - number
+            - "null"
+          format: float
+      required:
+        - name
+        - totalAmount
+        - unit
+        - fromRecipes
+    ShoppingList:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        dateRange:
+          type: object
+          properties:
+            startDate:
+              type: string
+              format: date
+            endDate:
+              type: string
+              format: date
+        totalItems:
+          type: integer
+        estimatedCost:
+          type:
+            - number
+            - "null"
+          format: float
+        ingredients:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShoppingListItem"
+        groupedIngredients:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: "#/components/schemas/ShoppingListItem"
+        summary:
+          type: object
+          properties:
+            totalRecipes:
+              type: integer
+            totalMeals:
+              type: integer
+            costByCategory:
+              type: object
+              additionalProperties:
+                type: number
+                format: float
+      required:
+        - generatedAt
+        - totalItems
+        - ingredients
+    MealPlanSuggestion:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        meals:
+          type: array
+          items:
+            type: object
+            properties:
+              mealType:
+                type: string
+                enum:
+                  - BREAKFAST
+                  - LUNCH
+                  - DINNER
+                  - SNACK
+              recipe:
+                $ref: ../components.yaml#/components/schemas/Recipe
+              suggestedServings:
+                type: integer
+              matchScore:
+                type: number
+                format: float
+                minimum: 0
+                maximum: 1
+                description: How well recipe matches user preferences
+              reason:
+                type: string
+                description: Explanation for why this recipe was suggested
+              alternatives:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    recipe:
+                      $ref: ../components.yaml#/components/schemas/Recipe
+                    matchScore:
+                      type: number
+                      format: float
+                maxItems: 3
+                description: Alternative recipe suggestions
+            required:
+              - mealType
+              - recipe
+              - suggestedServings
+              - matchScore
+      required:
+        - date
+        - meals
+    MealPlanSummary:
+      type: object
+      properties:
+        totalDays:
+          type: integer
+        plannedDays:
+          type: integer
+        totalMeals:
+          type: integer
+        uniqueRecipes:
+          type: integer
+        estimatedCost:
+          type:
+            - number
+            - "null"
+          format: float
+        nutritionalBalance:
+          type: object
+          properties:
+            score:
+              type: number
+              format: float
+              minimum: 0
+              maximum: 1
+              description: Overall nutritional balance score
+            notes:
+              type: array
+              items:
+                type: string
+              description: Nutritional recommendations
+        recipeDistribution:
+          type: object
+          properties:
+            byCategory:
+              type: object
+              additionalProperties:
+                type: integer
+            byDifficulty:
+              type: object
+              additionalProperties:
+                type: integer
+            byCookTime:
+              type: object
+              properties:
+                under30min:
+                  type: integer
+                30to60min:
+                  type: integer
+                over60min:
+                  type: integer
+

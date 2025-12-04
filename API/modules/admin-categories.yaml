@@ -1,0 +1,325 @@
+paths:
+  /admin/categories:
+    get:
+      tags:
+        - Admin - Categories
+      summary: UCA03-1 - View categories list
+      description: |
+        Get hierarchical list of all recipe categories for admin management.
+        Includes usage statistics and category relationships.
+
+        **ERD Entities:** CATEGORY
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: includeEmpty
+          in: query
+          description: Include categories with no recipes
+          schema:
+            type: boolean
+            default: true
+        - name: level
+          in: query
+          description: Category hierarchy level
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        "200":
+          description: Categories retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/CategoryListResponse
+      operationId: getAdminCategories
+    post:
+      tags:
+        - Admin - Categories
+      summary: UCA03-2 - Create new category
+      description: |
+        Create new recipe category with hierarchical support.
+
+        **ERD Entities:** CATEGORY
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../components.yaml#/components/schemas/CreateCategoryRequest
+      responses:
+        "201":
+          description: Category created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: ../components.yaml#/components/schemas/Category
+      operationId: createAdminCategories
+  /admin/categories/{categoryId}:
+    get:
+      tags:
+        - Admin - Categories
+      summary: Get category details
+      description: Get detailed category information with usage statistics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Category details retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    allOf:
+                      - $ref: ../components.yaml#/components/schemas/Category
+                      - type: object
+                        properties:
+                          statistics:
+                            type: object
+                            properties:
+                              activeRecipes:
+                                type: integer
+                              totalRecipes:
+                                type: integer
+                              subcategoriesCount:
+                                type: integer
+                              usageGrowth:
+                                type: number
+                                format: float
+      operationId: getAdminCategoriesByid
+    put:
+      tags:
+        - Admin - Categories
+      summary: UCA03-3 - Update category
+      description: Update category information
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../components.yaml#/components/schemas/CreateCategoryRequest
+      responses:
+        "200":
+          description: Category updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: ../components.yaml#/components/schemas/Category
+      operationId: updateAdminCategoriesByid
+    delete:
+      tags:
+        - Admin - Categories
+      summary: UCA03-4 - Delete category
+      description: Delete category with recipe reassignment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: reassignTo
+          in: query
+          description: Category ID to reassign existing recipes to
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Category deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/SuccessResponse
+      operationId: deleteAdminCategoriesByid
+  /admin/ingredients:
+    get:
+      tags:
+        - Admin - Categories
+      summary: UCA03-5 - View ingredients list
+      description: |
+        Get standardized ingredients list for system management.
+
+        **ERD Entities:** SYSTEM_INGREDIENT
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - $ref: ../components.yaml#/components/parameters/PageParam
+        - $ref: ../components.yaml#/components/parameters/LimitParam
+      responses:
+        "200":
+          description: Ingredients retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/IngredientListResponse
+      operationId: getAdminIngredients
+    post:
+      tags:
+        - Admin - Categories
+      summary: UCA03-6 - Create new ingredient
+      description: Add new standardized ingredient to system
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../components.yaml#/components/schemas/CreateIngredientRequest
+      responses:
+        "201":
+          description: Ingredient created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: ../components.yaml#/components/schemas/SystemIngredient
+      operationId: createAdminIngredients
+  /admin/ingredients/{ingredientId}:
+    get:
+      tags:
+        - Admin - Categories
+      summary: Get ingredient details
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ingredientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Ingredient details retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: ../components.yaml#/components/schemas/SystemIngredient
+      operationId: getAdminIngredientsByid
+    put:
+      tags:
+        - Admin - Categories
+      summary: UCA03-7 - Update ingredient
+      description: Update ingredient information
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ingredientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../components.yaml#/components/schemas/CreateIngredientRequest
+      responses:
+        "200":
+          description: Ingredient updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: ../components.yaml#/components/schemas/SystemIngredient
+      operationId: updateAdminIngredientsByid
+    delete:
+      tags:
+        - Admin - Categories
+      summary: UCA03-8 - Delete ingredient
+      description: Delete ingredient from system
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ingredientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Ingredient deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/SuccessResponse
+      operationId: deleteAdminIngredientsByid
+components:
+  schemas:
+    AdminCategoryView:
+      allOf:
+        - $ref: ../components.yaml#/components/schemas/Category
+        - type: object
+          properties:
+            statistics:
+              type: object
+              properties:
+                activeRecipes:
+                  type: integer
+                totalRecipes:
+                  type: integer
+                subcategoriesCount:
+                  type: integer
+                usageGrowth:
+                  type: number
+                  format: float
+

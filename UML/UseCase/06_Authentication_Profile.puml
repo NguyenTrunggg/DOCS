@@ -1,0 +1,81 @@
+@startuml Authentication_Profile
+title Use Case Diagram: Authentication & Profile (UC1)
+
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam shadowing false
+skinparam backgroundColor white
+
+left to right direction
+
+actor "User" as User #4ECDC4
+actor "Guest" as Guest #95A5A6
+
+rectangle "Authentication & Profile System" {
+  package "Authentication" {
+    usecase "UCS01-1\nRegister Account" as UC1 #E0F0FF
+    usecase "UCS01-2\nLogin" as UC2 #E0F0FF
+    usecase "UCS01-3\nLogout" as UC3 #E0F0FF
+    usecase "UCS01-7\nReset Password" as UC7 #FFE4B5
+  }
+  
+  package "Profile Management" {
+    usecase "UCS01-4\nView Profile" as UC4 #E0F0FF
+    usecase "UCS01-5\nUpdate Profile" as UC5 #FFE4B5
+    usecase "UCS01-6\nChange Password" as UC6 #FFE4B5
+  }
+}
+
+User --> UC1
+User --> UC2
+User --> UC3
+User --> UC4
+User --> UC5
+User --> UC6
+User --> UC7
+
+Guest --> UC1
+
+' Relationships
+UC5 ..> UC4 : <<include>>
+UC6 ..> UC4 : <<include>>
+UC1 ..> UC2 : <<extend>>
+
+note right of UC1
+  Email/Phone registration
+  Email/SMS verification
+  OAuth (Google/Facebook)
+  Password requirements
+end note
+
+note right of UC2
+  Multiple login methods
+  "Remember me" (30 days)
+  Rate limiting: 5 attempts
+  15 min lockout
+end note
+
+note right of UC5
+  Update display name
+  Change avatar
+  Auto-resize 150x150px
+end note
+
+note right of UC6
+  Verify old password
+  Disable all sessions
+  Security log
+end note
+
+note right of UC7
+  Forgot password flow
+  24-hour token
+  Email/SMS link
+  Max 3 attempts/hour
+end note
+
+@enduml
+
+
+
+

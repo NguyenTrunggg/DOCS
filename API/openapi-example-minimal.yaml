@@ -1,0 +1,257 @@
+openapi: 3.1.0
+info:
+  title: Recipe API - Minimal Example
+  description: Ví dụ đơn giản về OpenAPI cho hệ thống công thức nấu ăn
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Development server
+paths:
+  /recipes:
+    get:
+      summary: Lấy danh sách công thức
+      tags:
+        - Recipes
+      parameters:
+        - name: page
+          in: query
+          description: Số trang
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Số lượng per page
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+      responses:
+        "200":
+          description: Danh sách công thức
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      recipes:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Recipe"
+                      pagination:
+                        $ref: "#/components/schemas/Pagination"
+              example:
+                success: true
+                data:
+                  recipes:
+                    - id: 1
+                      title: Phở Bò
+                      description: Món phở truyền thống Việt Nam
+                      difficulty: medium
+                      cookingTime: 120
+                  pagination:
+                    page: 1
+                    limit: 10
+                    total: 50
+    post:
+      summary: Tạo công thức mới
+      tags:
+        - Recipes
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRecipeRequest"
+            example:
+              title: Bánh mì thịt nướng
+              description: Bánh mì Việt Nam với thịt nướng thơm ngon
+              difficulty: easy
+              cookingTime: 30
+              ingredients:
+                - name: Bánh mì
+                  quantity: 1
+                  unit: cái
+                - name: Thịt heo
+                  quantity: 200
+                  unit: gram
+      responses:
+        "201":
+          description: Tạo thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Recipe"
+        "400":
+          description: Dữ liệu không hợp lệ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/login:
+    post:
+      summary: Đăng nhập
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+            example:
+              email: user@example.com
+              password: password123
+      responses:
+        "200":
+          description: Đăng nhập thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                      user:
+                        $ref: "#/components/schemas/User"
+              example:
+                success: true
+                data:
+                  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  user:
+                    id: 1
+                    email: user@example.com
+                    fullName: Nguyễn Văn A
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Recipe:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        difficulty:
+          type: string
+          enum:
+            - easy
+            - medium
+            - hard
+        cookingTime:
+          type: integer
+          description: Thời gian nấu (phút)
+        ingredients:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              quantity:
+                type: number
+              unit:
+                type: string
+    CreateRecipeRequest:
+      type: object
+      required:
+        - title
+        - difficulty
+        - cookingTime
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        difficulty:
+          type: string
+          enum:
+            - easy
+            - medium
+            - hard
+        cookingTime:
+          type: integer
+          minimum: 1
+        ingredients:
+          type: array
+          items:
+            type: object
+            required:
+              - name
+              - quantity
+              - unit
+            properties:
+              name:
+                type: string
+              quantity:
+                type: number
+              unit:
+                type: string
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+            code:
+              type: string

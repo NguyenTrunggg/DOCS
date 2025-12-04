@@ -1,0 +1,148 @@
+Actor,Usecase Name,CRUD,Description,Detail description,Priority
+User,UC1: Quản lý Tài khoản,,,,
+, UC1.1: Đăng ký tài khoản,C,Người dùng tạo một tài khoản mới bằng email/số điện thoại và mật khẩu.,,Dễ
+, UC1.2: Đăng nhập vào hệ thống,R,Người dùng sử dụng tài khoản đã đăng ký để truy cập vào hệ thống.,,Dễ
+, UC1.3: Đăng xuất khỏi hệ thống,,Người dùng thoát khỏi phiên đăng nhập hiện tại.,,Dễ
+, UC1.4: Xem thông tin cá nhân,R,"Người dùng xem các thông tin cá nhân của mình như tên hiển thị, email, ảnh đại diện.",,Dễ
+, UC1.5: Cập nhật thông tin cá nhân,U,"Người dùng thay đổi tên hiển thị, ảnh đại diện.",,Trung bình
+, UC1.6: Đổi mật khẩu,U,Người dùng thay đổi mật khẩu hiện tại của tài khoản.,,Trung bình
+, UC1.7: Yêu cầu đặt lại mật khẩu,U,Người dùng yêu cầu hệ thống gửi hướng dẫn để đặt lại mật khẩu khi bị quên.,,Trung bình
+User,UC2: Tra cứu Công thức Nấu ăn,,,,
+, UC2.1: Tìm kiếm theo Nguyên liệu,R,"Người dùng nhập danh sách các nguyên liệu, hệ thống trả về các công thức phù hợp.","1. Người dùng truy cập trang tìm kiếm và chọn tab ""Tìm theo nguyên liệu"".
+2. Người dùng nhập (gõ hoặc chọn từ danh sách gợi ý) các nguyên liệu mình có, ví dụ: ""Thịt bò"", ""Khoai tây"", ""Cà rốt"".
+3. Người dùng nhấn nút ""Tìm kiếm"".
+4. Hệ thống thực hiện thuật toán tìm kiếm trong CSDL: 
+- Ưu tiên 1: Tìm các công thức chứa tất cả các nguyên liệu người dùng nhập. 
+- Ưu tiên 2: Tìm các công thức chứa nhiều nguyên liệu nhất có thể (ví dụ: N-1 nguyên liệu). 
+- Ưu tiên 3: Gợi ý các công thức chỉ cần thêm 1-2 nguyên liệu phổ biến khác.
+5. Hệ thống trả về một danh sách các công thức phù hợp, sắp xếp theo độ ưu tiên.Luồng rẽ nhánh:- Nếu không tìm thấy công thức nào, hệ thống sẽ hiển thị thông báo và kích hoạt UC2.3.",Khó
+, UC2.2: Tìm kiếm theo Tên món ăn,R,"Người dùng nhập tên món ăn, hệ thống trả về các công thức có tên tương ứng.","1.Người dùng nhập tên món ăn (ví dụ: ""thịt kho tàu"") vào ô tìm kiếm.
+2.Người dùng nhấn nút ""Tìm kiếm"".
+3.Hệ thống sẽ tìm và hiển thị một danh sách các công thức có tên khớp hoặc liên quan nhất đến từ khóa.
+4.Người dùng chọn một món trong danh sách để xem công thức chi tiết.
+* Nếu không có công thức nào phù hợp, hệ thống sẽ hiển thị thông báo ""Không tìm thấy kết quả"" và gợi ý người dùng kiểm tra lại chính tả hoặc thử tìm với một tên khác.",Trung bình
+, UC2.3: Tạo công thức bằng AI,C,"Nếu không tìm thấy kết quả, hệ thống gọi AI để tạo một công thức mới từ nguyên liệu.","Điều kiện tiên quyết: Việc tìm kiếm theo nguyên liệu (UC2.1) không trả về kết quả.
+1. Hệ thống hiển thị một thông báo: ""Không tìm thấy công thức phù hợp. Bạn có muốn sử dụng AI để tạo một công thức mới từ những nguyên liệu này không?"".
+2. Người dùng nhấn ""Đồng ý"".
+3. Hệ thống gửi một yêu cầu đến API của một mô hình ngôn ngữ lớn (như GPT) với một prompt được xây dựng sẵn, ví dụ: ""Hãy tạo một công thức nấu ăn ngon với các nguyên liệu chính là: [danh sách nguyên liệu người dùng nhập]. Cung cấp tên món ăn, danh sách nguyên liệu chi tiết và các bước thực hiện.""
+4. Hệ thống nhận phản hồi từ AI, xử lý và định dạng lại văn bản (tách tên, nguyên liệu, các bước).
+5. Hệ thống hiển thị công thức vừa được tạo ra cho người dùng.
+Xử lý ngoại lệ:
+- API của AI bị lỗi hoặc quá tải.
+- Kết quả trả về từ AI không đúng định dạng hoặc không hợp lý.",Rất khó
+, UC2.4: Lọc và Sắp xếp kết quả,R,"Người dùng lọc, sắp xếp kết quả tìm kiếm theo các tiêu chí khác nhau.","Điều kiện tiên quyết: Người dùng đã tìm thấy một công thức và nhấp vào nó.
+1. Hệ thống lấy ID của công thức được chọn.
+2. Hệ thống truy vấn CSDL để lấy toàn bộ thông tin: Ảnh/video minh họa, mô tả, danh sách nguyên liệu và định lượng, các bước thực hiện, thời gian nấu, độ khó, thông tin người tạo, điểm đánh giá trung bình và các bình luận.
+3. Hệ thống hiển thị tất cả thông tin trên một trang chi tiết.",Trung bình
+, UC2.5: Xem chi tiết Công thức,R,Người dùng xem thông tin chi tiết của một công thức nấu ăn.,,Trung bình
+User,UC3: Quản lý Công thức cá nhân,,,,
+, UC3.1: Thêm công thức mới,C,Người dùng tạo và gửi một công thức mới lên hệ thống để chờ duyệt.,"Điều kiện tiên quyết: Người dùng đã đăng nhập.
+1. Người dùng chọn chức năng ""Tạo công thức mới"".
+2. Hệ thống hiển thị một form chi tiết, yêu cầu người dùng nhập: - Tên món ăn. - Mô tả ngắn. - Ảnh/video đại diện. - Danh sách nguyên liệu (tên, định lượng, đơn vị). - Các bước thực hiện (mỗi bước có thể kèm ảnh). - Thời gian nấu, độ khó, khẩu phần ăn.
+3. Người dùng điền đầy đủ thông tin và nhấn ""Gửi duyệt"".
+4. Hệ thống kiểm tra dữ liệu và lưu công thức vào CSDL với trạng thái ""Chờ duyệt"".
+5. Hệ thống thông báo cho người dùng đã gửi thành công.",Trung bình
+, UC3.2: Xem danh sách công thức đã tạo,R,Người dùng xem lại danh sách các công thức mình đã đăng.,"1. Người dùng vào trang ""Công thức của tôi"".
+2. (Xem - UC3.2) Hệ thống hiển thị danh sách các công thức người dùng đã tạo, kèm theo trạng thái (Chờ duyệt, Đã duyệt, Bị từ chối).",Dễ
+, UC3.3: Chỉnh sửa công thức đã tạo,U,Người dùng chỉnh sửa lại thông tin công thức của mình đã đăng.,"3. (Sửa - UC3.3) Người dùng chọn ""Sửa"" ở một công thức. Hệ thống hiển thị lại form như lúc tạo với các dữ liệu cũ, người dùng chỉnh sửa và lưu lại.",Trung bình
+, UC3.4: Xóa công thức đã tạo,D,Người dùng xóa công thức do mình tạo ra khỏi hệ thống.,"4. (Xóa - UC3.4) Người dùng chọn ""Xóa"" ở một công thức. Hệ thống yêu cầu xác nhận. Nếu đồng ý, hệ thống sẽ xóa công thức đó khỏi CSDL.",Dễ
+User,UC4: Tương tác với Công thức,,,,
+, UC4.1: Thêm công thức vào Yêu thích,C,Người dùng lưu một công thức vào danh sách yêu thích của mình.,"1.Trên trang chi tiết công thức, người dùng nhấp vào biểu tượng ""Yêu thích"".
+2.Hệ thống lưu công thức vào danh sách yêu thích của người dùng.
+3.Biểu tượng ""Yêu thích"" đổi trạng thái (ví dụ: được tô màu) và hệ thống hiển thị thông báo ""Đã thêm vào Yêu thích"".
+Xử lý ngoại lệ: Nếu chưa đăng nhập, hệ thống yêu cầu người dùng đăng nhập trước. ",Dễ
+, UC4.2: Gỡ công thức khỏi Yêu thích,D,Người dùng gỡ bỏ một công thức khỏi danh sách yêu thích.,"1.Người dùng nhấp lại vào biểu tượng ""Yêu thích"" (đang ở trạng thái đã lưu).
+2.Hệ thống gỡ bỏ công thức này khỏi danh sách yêu thích.
+3.Biểu tượng ""Yêu thích"" trở về trạng thái ban đầu và hiển thị thông báo ""Đã gỡ khỏi Yêu thích"". ",Dễ
+, UC4.3: Xem danh sách công thức Yêu thích,R,Người dùng xem lại tất cả các công thức mình đã lưu.,"1.Người dùng truy cập vào mục ""Công thức yêu thích"".
+2.Hệ thống hiển thị toàn bộ các công thức mà người dùng đã lưu.",Dễ
+, UC4.4: Gửi đánh giá và bình luận,C,Người dùng chấm điểm (sao) và viết bình luận cho một công thức.,"1.Người dùng chọn số sao đánh giá (từ 1 đến 5 sao) và nhập nội dung bình luận.
+2.Người dùng nhấn nút ""Gửi"".
+3.Hệ thống lưu lại đánh giá, bình luận và hiển thị ngay lập tức trong danh sách.
+Điều kiện sau: Điểm đánh giá trung bình của công thức được cập nhật. ",Trung bình
+, UC4.5: Xem đánh giá và bình luận,R,Người dùng đọc các bình luận và điểm đánh giá của người khác về công thức.,"1.Người dùng kéo xuống phần bình luận trên trang chi tiết công thức.
+2.Hệ thống hiển thị điểm đánh giá trung bình và danh sách tất cả bình luận từ những người dùng khác",Dễ
+, UC4.6: Chia sẻ công thức,,Người dùng chia sẻ một công thức lên các nền tảng mạng xã hội.,"1.Người dùng nhấp vào nút ""Chia sẻ"".
+2.Hệ thống hiển thị các tùy chọn như ""Sao chép đường dẫn"", ""Chia sẻ lên Facebook"",...
+3.Người dùng chọn một phương thức và hệ thống thực hiện hành động tương ứng.",Dễ
+User,"UC5: Quản lý ""Tủ lạnh ảo""",,,,
+, UC5.1: Thêm nguyên liệu vào tủ,C,Người dùng thêm một loại nguyên liệu mới vào danh sách đang có.,,Dễ
+, UC5.2: Xem danh sách nguyên liệu trong tủ,R,"Người dùng xem tất cả các nguyên liệu hiện có trong ""tủ lạnh"" của mình.",,Dễ
+, UC5.3: Cập nhật số lượng nguyên liệu,U,Người dùng thay đổi số lượng/đơn vị của một nguyên liệu đã có.,,Dễ
+, UC5.4: Xóa nguyên liệu khỏi tủ,D,Người dùng xóa một nguyên liệu đã hết hoặc không còn sử dụng.,,Dễ
+User,UC6: Lên kế hoạch bữa ăn,,,,
+, UC6.1: Tạo kế hoạch bữa ăn,C,Người dùng tạo một kế hoạch mới và thêm các món ăn vào lịch theo ngày.,,Trung bình
+, UC6.2: Xem kế hoạch bữa ăn,R,Người dùng xem lại kế hoạch ăn uống đã lên cho tuần/tháng.,,Dễ
+, UC6.3: Chỉnh sửa kế hoạch bữa ăn,U,"Người dùng thay đổi, di chuyển hoặc thay thế các món ăn trong kế hoạch.",,Trung bình
+, UC6.4: Xóa kế hoạch bữa ăn,D,Người dùng xóa một kế hoạch đã tạo.,,Dễ
+, UC6.5: Tạo danh sách mua sắm từ kế hoạch,C,Hệ thống tự động tạo ra danh sách nguyên liệu cần mua dựa trên kế hoạch.,,
+Admin,UC-A1: Quản lý Người dùng,,,,
+, UC-A1.1: Xem danh sách người dùng,R,"Admin xem danh sách tất cả người dùng, có thể tìm kiếm và lọc.","1. Admin vào mục ""Quản lý Người dùng"".
+2. Hệ thống hiển thị một bảng danh sách tất cả người dùng với các thông tin cơ bản: ID, Tên hiển thị, Email, Ngày tham gia, Trạng thái (Hoạt động/Bị khóa).
+3. Hệ thống cung cấp các công cụ tìm kiếm, lọc (theo tên/email) và phân trang.",Dễ
+, UC-A1.2: Xem chi tiết người dùng,R,"Admin xem thông tin chi tiết, lịch sử hoạt động của một người dùng.","1.Từ danh sách người dùng, Admin nhấp vào tên hoặc một nút ""Xem chi tiết"" của một người dùng cụ thể.
+2.Hệ thống truy vấn và hiển thị một trang thông tin chi tiết về người dùng đó, bao gồm:
+- Thông tin tài khoản: Ảnh đại diện, Tên hiển thị, Email, ID người dùng, Ngày đăng ký, Lần đăng nhập cuối.
+- Thống kê hoạt động: Tổng số công thức đã đăng, số công thức đã được duyệt, số công thức bị từ chối, tổng số bình luận.
+- Lịch sử hoạt động: Danh sách các công thức gần đây người dùng đã đăng, cho phép Admin nhấp vào xem trực tiếp.",Dễ
+, UC-A1.3: Vô hiệu hóa tài khoản người dùng,U,"Admin khóa tài khoản của người dùng vi phạm, ngăn họ đăng nhập.","1. Từ danh sách người dùng, Admin tìm đến người dùng cần xử lý.
+2. Admin nhấn nút ""Khóa"" hoặc ""Mở khóa"".
+3. Hệ thống yêu cầu xác nhận hành động.
+4. Admin xác nhận. Hệ thống cập nhật trạng thái của tài khoản người dùng trong CSDL.
+Điều kiện sau:- Nếu khóa: Người dùng đó sẽ không thể đăng nhập vào hệ thống.- Nếu mở khóa: Người dùng có thể đăng nhập lại bình thường.",Trung bình
+, UC-A1.4: Kích hoạt lại tài khoản người dùng,U,Admin mở khóa cho một tài khoản đã bị vô hiệu hóa trước đó.,,Trung bình
+Admin,UC-A2: Quản lý Công thức,,,,
+, UC-A2.1: Xem danh sách công thức hệ thống,R,"Admin xem, tìm kiếm, lọc tất cả công thức có trên hệ thống.","1.Admin truy cập mục ""Quản lý Công thức"".
+2.Hệ thống hiển thị một bảng danh sách tất cả công thức (cả của hệ thống và của người dùng đã được duyệt).
+3.Bảng này bao gồm các thông tin như ID, Tên công thức, Người tạo, Trạng thái (Đã duyệt, Chờ duyệt), Ngày tạo.
+4.Hệ thống cung cấp các công cụ để tìm kiếm, lọc (theo trạng thái) và phân trang.",Dễ
+, UC-A2.2: Thêm công thức hệ thống,C,Admin tạo một công thức mới với tư cách là nguồn chính thức của hệ thống.,"1.Admin nhấn nút ""Thêm công thức mới"".
+2.Hệ thống hiển thị một form nhập liệu chi tiết (tên món, mô tả, nguyên liệu, các bước, ảnh/video, độ khó, v.v.).
+3.Admin điền đầy đủ thông tin và nhấn ""Lưu"" hoặc ""Xuất bản"".
+4.Hệ thống lưu công thức mới vào cơ sở dữ liệu với trạng thái ""Đã duyệt"" mặc định vì do Admin tạo. ",Trung bình
+, UC-A2.3: Sửa công thức hệ thống,U,Admin chỉnh sửa thông tin của một công thức bất kỳ trên hệ thống.,"1.Từ danh sách công thức, Admin chọn một công thức bất kỳ và nhấn nút ""Sửa"".
+2.Hệ thống hiển thị lại form nhập liệu với tất cả thông tin của công thức đó đã được điền sẵn.
+3.Admin chỉnh sửa các thông tin cần thiết (sửa lỗi chính tả, cập nhật hình ảnh, thay đổi nguyên liệu...).
+4.Admin nhấn ""Lưu"" để cập nhật các thay đổi.",Trung bình
+, UC-A2.4: Xóa công thức hệ thống,D,Admin xóa vĩnh viễn một công thức ra khỏi hệ thống.,"1.Từ danh sách công thức, Admin chọn một công thức và nhấn nút ""Xóa"".
+2.Hệ thống hiển thị một hộp thoại xác nhận để tránh xóa nhầm.
+3.Admin xác nhận.
+4.Hệ thống xóa vĩnh viễn công thức đó khỏi cơ sở dữ liệu.",Dễ
+, UC-A2.5: Xem danh sách công thức chờ duyệt,R,Admin xem danh sách các công thức do người dùng gửi lên đang chờ duyệt.,"1.Admin truy cập mục ""Kiểm duyệt"" hoặc lọc danh sách công thức với trạng thái ""Chờ duyệt"".
+2.Hệ thống hiển thị một danh sách chỉ bao gồm các công thức do người dùng gửi lên và đang trong hàng đợi chờ được xem xét.",Dễ
+, UC-A2.6: Phê duyệt công thức,U,Admin duyệt và cho phép công thức của người dùng được hiển thị công khai.,"1.Admin chọn một công thức từ danh sách ""Chờ duyệt"" để xem chi tiết.
+2.Admin kiểm tra chất lượng nội dung (thông tin rõ ràng, hình ảnh phù hợp, không vi phạm quy định).
+3.Nếu công thức đạt yêu cầu, Admin nhấn nút ""Phê duyệt"".
+4.Hệ thống cập nhật trạng thái của công thức thành ""Đã duyệt"".",Trung bình
+, UC-A2.7: Từ chối công thức,U,Admin từ chối công thức của người dùng và gửi lý do.,"1.Sau khi xem xét một công thức đang chờ duyệt, nếu nội dung không đạt yêu cầu, Admin nhấn nút ""Từ chối"".
+2.Hệ thống sẽ hiển thị một hộp thoại yêu cầu Admin nhập lý do từ chối (ví dụ: ""Hình ảnh mờ"", ""Hướng dẫn không rõ ràng"").
+3.Admin nhập lý do và xác nhận.
+4.Hệ thống cập nhật trạng thái của công thức thành ""Bị từ chối"" và lưu lại lý do.
+Điều kiện sau:
+Công thức không được công khai. Người dùng đã gửi công thức sẽ nhận được thông báo về việc bị từ chối kèm theo lý do.",Trung bình
+Admin,UC-A3: Quản lý Danh mục & Nguyên liệu,,,,
+, UC-A3.1: Xem danh sách danh mục,R,Admin xem tất cả danh mục món ăn hiện có.,"1.Admin truy cập mục ""Quản lý Danh mục"".
+2.Hệ thống hiển thị một bảng danh sách tất cả các danh mục món ăn hiện có (ví dụ: Món chính, Món tráng miệng, Món chay, Món Hàn...). ",Dễ
+, UC-A3.2: Thêm danh mục mới,C,"Admin tạo một danh mục món ăn mới (VD: Món Nhật, Món Hàn).","1.Admin nhấn nút ""Thêm mới"".
+2.Hệ thống hiển thị một form yêu cầu nhập Tên danh mục và Mô tả (tùy chọn).
+3.Admin nhập thông tin và nhấn ""Lưu"". Danh mục mới sẽ xuất hiện trong danh sách.",Dễ
+, UC-A3.3: Sửa tên danh mục,U,Admin chỉnh sửa tên hoặc mô tả của một danh mục.,"1.Từ danh sách, Admin chọn ""Sửa"" ở một danh mục.
+2.Form chỉnh sửa xuất hiện với thông tin cũ.
+3.Admin thay đổi tên hoặc mô tả và nhấn ""Lưu"" để cập nhật.",Dễ
+, UC-A3.4: Xóa danh mục,D,Admin xóa một danh mục khỏi hệ thống.,"1.Admin chọn ""Xóa"" ở một danh mục.
+2.Hệ thống yêu cầu xác nhận.
+3.Admin đồng ý, hệ thống sẽ xóa danh mục đó.
+Xử lý ngoại lệ:
+Nếu danh mục đang được sử dụng bởi các công thức, hệ thống nên cảnh báo và yêu cầu Admin chuyển các công thức đó sang danh mục khác trước khi xóa.",Dễ
+, UC-A3.5: Xem danh sách nguyên liệu,R,Admin xem danh sách các nguyên liệu đã được chuẩn hóa trong CSDL.,"1.Admin truy cập mục ""Quản lý Nguyên liệu"".
+2.Hệ thống hiển thị danh sách tất cả các nguyên liệu đã được chuẩn hóa trong cơ sở dữ liệu. Đây là dữ liệu gốc để người dùng chọn khi tìm kiếm hoặc thêm công thức. ",Dễ
+, UC-A3.6: Thêm nguyên liệu mới,C,Admin thêm một nguyên liệu mới vào CSDL để hệ thống nhận diện.,,Trung bình
+, UC-A3.7: Sửa thông tin nguyên liệu,U,"Admin chỉnh sửa tên, đơn vị của một nguyên liệu.",,Dễ
+, UC-A3.8: Xóa nguyên liệu,D,Admin xóa một nguyên liệu khỏi CSDL.,,Dễ
+Admin,UC-A4: Quản lý Tài khoản Admin & Phân quyền,,,,
+, UC-A4.1: Xem danh sách tài khoản Admin,R,Super Admin xem danh sách các tài khoản quản trị khác.,,Dễ
+, UC-A4.2: Tạo tài khoản Admin mới,C,Super Admin tạo một tài khoản quản trị mới.,,Trung bình
+, UC-A4.3: Phân quyền cho tài khoản Admin,U,Super Admin gán/thay đổi quyền hạn cho một tài khoản Admin.,,Khó
+, UC-A4.4: Xóa tài khoản Admin,D,Super Admin xóa một tài khoản quản trị.,,Dễ
+Admin,UC-A5: Dashboard & Thống kê,,,,
+," UC-A5.1: Xem báo cáo, thống kê",R,"Admin xem các biểu đồ, số liệu về hoạt động của hệ thống.",,Khó

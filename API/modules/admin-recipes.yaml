@@ -1,0 +1,1094 @@
+paths:
+  /admin/recipes:
+    get:
+      tags:
+        - Admin - Recipes
+      summary: UCA02-1 - View all recipes (system and user)
+      description: |
+        Get comprehensive list of all recipes in the system for admin oversight.
+        Includes system recipes, user submissions, and approval status.
+
+        **Business Rules:**
+        - Shows ALL recipes regardless of status (DRAFT, PENDING, APPROVED, REJECTED)
+        - Includes detailed approval information and admin actions
+        - Supports filtering by status, creator type, category
+        - Shows flagged or reported recipes for moderation
+
+        **ERD Entities:** RECIPE, USER, CATEGORY, AUDIT_LOG
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeStatusParam
+        - name: creatorType
+          in: query
+          description: Filter by creator type
+          schema:
+            type: string
+            enum:
+              - system
+              - user
+              - admin
+        - name: createdBy
+          in: query
+          description: Filter by specific creator ID
+          schema:
+            type: string
+            format: uuid
+        - name: category
+          in: query
+          description: Filter by category ID
+          schema:
+            type: string
+            format: uuid
+        - name: flagged
+          in: query
+          description: Show only flagged/reported recipes
+          schema:
+            type: boolean
+        - name: sortBy
+          in: query
+          description: Sort recipes by
+          schema:
+            type: string
+            enum:
+              - createdAt
+              - updatedAt
+              - name
+              - status
+              - views
+              - reports
+            default: updatedAt
+        - name: order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+        - $ref: ../components.yaml#/components/parameters/PageParam
+        - $ref: ../components.yaml#/components/parameters/LimitParam
+      responses:
+        "200":
+          description: Recipes list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      recipes:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: ../components.yaml#/components/schemas/Recipe
+                            - type: object
+                              properties:
+                                adminInfo:
+                                  type: object
+                                  properties:
+                                    creatorType:
+                                      type: string
+                                      enum:
+                                        - system
+                                        - user
+                                        - admin
+                                    approvalInfo:
+                                      type: object
+                                      properties:
+                                        approvedBy:
+                                          type:
+                                            - string
+                                            - "null"
+                                          format: uuid
+                                        approvedAt:
+                                          type:
+                                            - string
+                                            - "null"
+                                          format: date-time
+                                        rejectedBy:
+                                          type:
+                                            - string
+                                            - "null"
+                                          format: uuid
+                                        rejectedAt:
+                                          type:
+                                            - string
+                                            - "null"
+                                          format: date-time
+                                        rejectionReason:
+                                          type:
+                                            - string
+                                            - "null"
+                                    reportCount:
+                                      type: integer
+                                      description: Number of user reports
+                                    flags:
+                                      type: array
+                                      items:
+                                        type: string
+                                      description: Admin flags for this recipe
+                                    lastReviewed:
+                                      type:
+                                        - string
+                                        - "null"
+                                      format: date-time
+                      pagination:
+                        $ref: ../components.yaml#/components/schemas/Pagination
+                      summary:
+                        type: object
+                        properties:
+                          totalRecipes:
+                            type: integer
+                          statusBreakdown:
+                            type: object
+                            properties:
+                              APPROVED:
+                                type: integer
+                              PENDING:
+                                type: integer
+                              REJECTED:
+                                type: integer
+                              DRAFT:
+                                type: integer
+                          pendingReviewCount:
+                            type: integer
+                          flaggedRecipesCount:
+                            type: integer
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+      operationId: getAdminRecipes
+    post:
+      tags:
+        - Admin - Recipes
+      summary: UCA02-2 - Create system recipe
+      description: |
+        Create official system recipe with automatic approval.
+        System recipes bypass normal approval process.
+
+        **Business Rules:**
+        - Requires admin authentication with recipe management permissions
+        - System recipes are automatically APPROVED status
+        - Created by system/admin, not regular users
+        - Can include official nutritional information and dietary tags
+
+        **ERD Entities:** RECIPE, INGREDIENT, RECIPE_STEP, RECIPE_MEDIA
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: ../components.yaml#/components/schemas/CreateRecipeRequest
+                - type: object
+                  properties:
+                    isOfficial:
+                      type: boolean
+                      default: true
+                      description: Mark as official system recipe
+                    officialNutrition:
+                      $ref: ../components.yaml#/components/schemas/NutritionalInfo
+                      description: Official nutritional information
+                    certifications:
+                      type: array
+                      items:
+                        type: string
+                      description: Official certifications (halal, organic, etc.)
+                    adminNotes:
+                      type: string
+                      maxLength: 1000
+                      description: Internal admin notes
+            example:
+              name: Phở Bò Hà Nội Truyền Thống
+              description: Công thức phở bò chính thống theo truyền thống Hà Nội
+              categoryId: 123e4567-e89b-12d3-a456-426614174001
+              difficulty: HARD
+              servings: 4
+              prepTime: 180
+              cookTime: 240
+              isOfficial: true
+              certifications:
+                - traditional
+                - authentic
+      responses:
+        "201":
+          description: System recipe created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    allOf:
+                      - $ref: ../components.yaml#/components/schemas/RecipeDetail
+                      - type: object
+                        properties:
+                          systemRecipe:
+                            type: boolean
+                            example: true
+                          autoApproved:
+                            type: boolean
+                            example: true
+        "400":
+          $ref: ../components.yaml#/components/responses/BadRequest
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+      operationId: createAdminRecipes
+  /admin/recipes/system:
+    get:
+      tags:
+        - Admin - Recipes
+      summary: Get system recipes only
+      description: |
+        Get list of official system recipes for management.
+
+        **ERD Entities:** RECIPE (where created_by is system/admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: category
+          in: query
+          description: Filter by category
+          schema:
+            type: string
+            format: uuid
+        - $ref: ../components.yaml#/components/parameters/DifficultyParam
+        - $ref: ../components.yaml#/components/parameters/PageParam
+        - $ref: ../components.yaml#/components/parameters/LimitParam
+      responses:
+        "200":
+          description: System recipes retrieved
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/RecipeListResponse
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+      operationId: getAdminRecipesSystem
+  /admin/recipes/pending:
+    get:
+      tags:
+        - Admin - Recipes
+      summary: UCA02-5 - Get pending recipes
+      description: |
+        Get list of user-submitted recipes awaiting approval.
+        Prioritized by submission date and user history.
+
+        **Business Rules:**
+        - Shows only PENDING status recipes from users
+        - Includes user reputation and submission history
+        - Supports priority sorting for review efficiency
+        - Shows estimated review time based on complexity
+
+        **ERD Entities:** RECIPE, USER
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: priority
+          in: query
+          description: Filter by review priority
+          schema:
+            type: string
+            enum:
+              - high
+              - medium
+              - low
+        - name: submittedAfter
+          in: query
+          description: Submitted after date
+          schema:
+            type: string
+            format: date
+        - name: sortBy
+          in: query
+          description: Sort by priority factors
+          schema:
+            type: string
+            enum:
+              - submittedAt
+              - priority
+              - userReputation
+              - complexity
+            default: submittedAt
+        - $ref: ../components.yaml#/components/parameters/PageParam
+        - $ref: ../components.yaml#/components/parameters/LimitParam
+      responses:
+        "200":
+          description: Pending recipes retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      recipes:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: ../components.yaml#/components/schemas/Recipe
+                            - type: object
+                              properties:
+                                submissionInfo:
+                                  type: object
+                                  properties:
+                                    submittedAt:
+                                      type: string
+                                      format: date-time
+                                    waitingTime:
+                                      type: integer
+                                      description: Days waiting for review
+                                    priority:
+                                      type: string
+                                      enum:
+                                        - high
+                                        - medium
+                                        - low
+                                    estimatedReviewTime:
+                                      type: integer
+                                      description: Estimated review minutes
+                                userInfo:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                    displayName:
+                                      type: string
+                                    reputation:
+                                      type: number
+                                      format: float
+                                      description: User reputation score
+                                    approvedRecipes:
+                                      type: integer
+                                    rejectedRecipes:
+                                      type: integer
+                                    isNewUser:
+                                      type: boolean
+                      pagination:
+                        $ref: ../components.yaml#/components/schemas/Pagination
+                      summary:
+                        type: object
+                        properties:
+                          totalPending:
+                            type: integer
+                          avgWaitTime:
+                            type: number
+                            format: float
+                          priorityBreakdown:
+                            type: object
+                            properties:
+                              high:
+                                type: integer
+                              medium:
+                                type: integer
+                              low:
+                                type: integer
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+      operationId: getAdminRecipesPending
+  /admin/recipes/{recipeId}:
+    get:
+      tags:
+        - Admin - Recipes
+      summary: Get recipe details for admin review
+      description: |
+        Get comprehensive recipe details for admin review and decision making.
+
+        **ERD Entities:** RECIPE, INGREDIENT, RECIPE_STEP, USER, RATING, COMMENT
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+      responses:
+        "200":
+          description: Recipe details for admin review
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    allOf:
+                      - $ref: ../components.yaml#/components/schemas/RecipeDetail
+                      - type: object
+                        properties:
+                          adminReview:
+                            type: object
+                            properties:
+                              canApprove:
+                                type: boolean
+                              canReject:
+                                type: boolean
+                              canEdit:
+                                type: boolean
+                              qualityChecks:
+                                type: object
+                                properties:
+                                  hasImages:
+                                    type: boolean
+                                  ingredientsComplete:
+                                    type: boolean
+                                  stepsDetailed:
+                                    type: boolean
+                                  grammarCheck:
+                                    type: string
+                                    enum:
+                                      - pass
+                                      - warning
+                                      - fail
+                                  duplicateCheck:
+                                    type: object
+                                    properties:
+                                      isDuplicate:
+                                        type: boolean
+                                      similarRecipes:
+                                        type: array
+                                        items:
+                                          type: object
+                                          properties:
+                                            id:
+                                              type: string
+                                              format: uuid
+                                            name:
+                                              type: string
+                                            similarity:
+                                              type: number
+                                              format: float
+                              reviewHistory:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    action:
+                                      type: string
+                                      enum:
+                                        - SUBMITTED
+                                        - REVIEWED
+                                        - APPROVED
+                                        - REJECTED
+                                        - FLAGGED
+                                    adminId:
+                                      type:
+                                        - string
+                                        - "null"
+                                      format: uuid
+                                    timestamp:
+                                      type: string
+                                      format: date-time
+                                    notes:
+                                      type:
+                                        - string
+                                        - "null"
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: getAdminRecipesByid
+    put:
+      tags:
+        - Admin - Recipes
+      summary: UCA02-3 - Update recipe (admin)
+      description: |
+        Admin update/edit any recipe in the system.
+        Can modify system recipes or user recipes.
+
+        **ERD Entities:** RECIPE, INGREDIENT, RECIPE_STEP, RECIPE_MEDIA
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: ../components.yaml#/components/schemas/CreateRecipeRequest
+                - type: object
+                  properties:
+                    adminNotes:
+                      type: string
+                      maxLength: 1000
+                      description: Admin notes for this edit
+                    notifyAuthor:
+                      type: boolean
+                      default: true
+                      description: Notify original author of changes
+      responses:
+        "200":
+          description: Recipe updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: ../components.yaml#/components/schemas/RecipeDetail
+        "400":
+          $ref: ../components.yaml#/components/responses/BadRequest
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: updateAdminRecipesByid
+    delete:
+      tags:
+        - Admin - Recipes
+      summary: UCA02-4 - Delete recipe (admin)
+      description: |
+        Admin delete any recipe from the system.
+        Uses soft delete to preserve references and audit trail.
+
+        **ERD Entities:** RECIPE
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+        - name: reason
+          in: query
+          required: true
+          description: Reason for deletion
+          schema:
+            type: string
+            minLength: 10
+            maxLength: 500
+        - name: notifyAuthor
+          in: query
+          description: Notify original author
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: Recipe deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/SuccessResponse
+        "400":
+          $ref: ../components.yaml#/components/responses/BadRequest
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: deleteAdminRecipesByid
+  /admin/recipes/{recipeId}/approve:
+    put:
+      tags:
+        - Admin - Recipes
+      summary: UCA02-6 - Approve recipe
+      description: |
+        Approve user-submitted recipe for public visibility.
+        Changes status to APPROVED and makes recipe searchable.
+
+        **Business Rules:**
+        - Only PENDING recipes can be approved
+        - Approved recipes become publicly visible and searchable
+        - Creates audit log entry for approval decision
+        - Sends notification to recipe author
+        - Updates recipe approval statistics
+
+        **ERD Entities:** RECIPE, AUDIT_LOG
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                approvalNotes:
+                  type: string
+                  maxLength: 500
+                  description: Optional approval notes
+                featuredRecipe:
+                  type: boolean
+                  default: false
+                  description: Mark as featured recipe
+                qualityRating:
+                  type: string
+                  enum:
+                    - excellent
+                    - good
+                    - acceptable
+                  default: acceptable
+                  description: Quality assessment
+                notifyAuthor:
+                  type: boolean
+                  default: true
+            example:
+              approvalNotes: Excellent recipe with clear instructions and good photos
+              featuredRecipe: false
+              qualityRating: excellent
+      responses:
+        "200":
+          description: Recipe approved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      recipe:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          name:
+                            type: string
+                          status:
+                            type: string
+                            example: APPROVED
+                          approvedAt:
+                            type: string
+                            format: date-time
+                          approvedBy:
+                            type: string
+                            format: uuid
+                      auditLog:
+                        $ref: ../components.yaml#/components/schemas/AuditLog
+                      notificationSent:
+                        type: boolean
+        "400":
+          description: Cannot approve recipe
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              examples:
+                not_pending:
+                  summary: Recipe not pending
+                  value:
+                    success: false
+                    error:
+                      code: NOT_PENDING_APPROVAL
+                      message: Only pending recipes can be approved
+                      details:
+                        currentStatus: APPROVED
+                quality_issues:
+                  summary: Quality issues found
+                  value:
+                    success: false
+                    error:
+                      code: QUALITY_ISSUES
+                      message: Recipe has quality issues that must be addressed
+                      details:
+                        issues:
+                          - missing_images
+                          - incomplete_steps
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: updateAdminRecipesByidApprove
+  /admin/recipes/{recipeId}/reject:
+    put:
+      tags:
+        - Admin - Recipes
+      summary: UCA02-7 - Reject recipe
+      description: |
+        Reject user-submitted recipe with detailed feedback.
+        Changes status to REJECTED and provides improvement guidance.
+
+        **Business Rules:**
+        - Only PENDING recipes can be rejected
+        - Must provide detailed rejection reason for user learning
+        - Creates audit log entry for rejection decision
+        - Sends constructive feedback to recipe author
+        - Author can resubmit after addressing issues
+
+        **ERD Entities:** RECIPE, AUDIT_LOG
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rejectionReason:
+                  type: string
+                  minLength: 20
+                  maxLength: 1000
+                  description: Detailed reason for rejection
+                issues:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - UNCLEAR_INSTRUCTIONS
+                      - MISSING_INGREDIENTS
+                      - POOR_IMAGES
+                      - DUPLICATE_CONTENT
+                      - INAPPROPRIATE_CONTENT
+                      - SAFETY_CONCERNS
+                  minItems: 1
+                  description: Specific issues identified
+                suggestions:
+                  type: string
+                  maxLength: 1000
+                  description: Constructive suggestions for improvement
+                allowResubmission:
+                  type: boolean
+                  default: true
+                  description: Allow author to resubmit after fixes
+                notifyAuthor:
+                  type: boolean
+                  default: true
+              required:
+                - rejectionReason
+                - issues
+            example:
+              rejectionReason: Recipe instructions are unclear and missing several key preparation steps. Images
+                are blurry and don't clearly show the cooking process.
+              issues:
+                - UNCLEAR_INSTRUCTIONS
+                - POOR_IMAGES
+              suggestions: Please provide step-by-step photos and more detailed cooking instructions, especially
+                for the sauce preparation.
+              allowResubmission: true
+      responses:
+        "200":
+          description: Recipe rejected successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      recipe:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          name:
+                            type: string
+                          status:
+                            type: string
+                            example: REJECTED
+                          rejectedAt:
+                            type: string
+                            format: date-time
+                          rejectedBy:
+                            type: string
+                            format: uuid
+                          rejectionInfo:
+                            type: object
+                            properties:
+                              reason:
+                                type: string
+                              issues:
+                                type: array
+                                items:
+                                  type: string
+                              suggestions:
+                                type: string
+                              canResubmit:
+                                type: boolean
+                      auditLog:
+                        $ref: ../components.yaml#/components/schemas/AuditLog
+                      feedbackSent:
+                        type: boolean
+        "400":
+          description: Cannot reject recipe
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              examples:
+                not_pending:
+                  summary: Recipe not pending
+                  value:
+                    success: false
+                    error:
+                      code: NOT_PENDING_APPROVAL
+                      message: Only pending recipes can be rejected
+                insufficient_reason:
+                  summary: Rejection reason too short
+                  value:
+                    success: false
+                    error:
+                      code: INSUFFICIENT_FEEDBACK
+                      message: Rejection reason must be at least 20 characters for constructive feedback
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: updateAdminRecipesByidReject
+components:
+  schemas:
+    AdminRecipeView:
+      allOf:
+        - $ref: ../components.yaml#/components/schemas/Recipe
+        - type: object
+          properties:
+            adminInfo:
+              $ref: "#/components/schemas/RecipeAdminInfo"
+    RecipeAdminInfo:
+      type: object
+      properties:
+        creatorType:
+          type: string
+          enum:
+            - system
+            - user
+            - admin
+        approvalInfo:
+          type: object
+          properties:
+            approvedBy:
+              type:
+                - string
+                - "null"
+              format: uuid
+            approvedAt:
+              type:
+                - string
+                - "null"
+              format: date-time
+            rejectedBy:
+              type:
+                - string
+                - "null"
+              format: uuid
+            rejectedAt:
+              type:
+                - string
+                - "null"
+              format: date-time
+            rejectionReason:
+              type:
+                - string
+                - "null"
+        reportCount:
+          type: integer
+        flags:
+          type: array
+          items:
+            type: string
+        lastReviewed:
+          type:
+            - string
+            - "null"
+          format: date-time
+    RecipePendingReview:
+      allOf:
+        - $ref: ../components.yaml#/components/schemas/Recipe
+        - type: object
+          properties:
+            submissionInfo:
+              type: object
+              properties:
+                submittedAt:
+                  type: string
+                  format: date-time
+                waitingTime:
+                  type: integer
+                priority:
+                  type: string
+                  enum:
+                    - high
+                    - medium
+                    - low
+                estimatedReviewTime:
+                  type: integer
+            userInfo:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                displayName:
+                  type: string
+                reputation:
+                  type: number
+                  format: float
+                approvedRecipes:
+                  type: integer
+                rejectedRecipes:
+                  type: integer
+                isNewUser:
+                  type: boolean
+    RecipeQualityCheck:
+      type: object
+      properties:
+        hasImages:
+          type: boolean
+        ingredientsComplete:
+          type: boolean
+        stepsDetailed:
+          type: boolean
+        grammarCheck:
+          type: string
+          enum:
+            - pass
+            - warning
+            - fail
+        duplicateCheck:
+          type: object
+          properties:
+            isDuplicate:
+              type: boolean
+            similarRecipes:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+                  similarity:
+                    type: number
+                    format: float
+        overallScore:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+    RecipeApprovalRequest:
+      type: object
+      properties:
+        approvalNotes:
+          type: string
+          maxLength: 500
+        featuredRecipe:
+          type: boolean
+          default: false
+        qualityRating:
+          type: string
+          enum:
+            - excellent
+            - good
+            - acceptable
+        notifyAuthor:
+          type: boolean
+          default: true
+    RecipeRejectionRequest:
+      type: object
+      properties:
+        rejectionReason:
+          type: string
+          minLength: 20
+          maxLength: 1000
+        issues:
+          type: array
+          items:
+            type: string
+            enum:
+              - UNCLEAR_INSTRUCTIONS
+              - MISSING_INGREDIENTS
+              - POOR_IMAGES
+              - DUPLICATE_CONTENT
+              - INAPPROPRIATE_CONTENT
+              - SAFETY_CONCERNS
+          minItems: 1
+        suggestions:
+          type: string
+          maxLength: 1000
+        allowResubmission:
+          type: boolean
+          default: true
+        notifyAuthor:
+          type: boolean
+          default: true
+      required:
+        - rejectionReason
+        - issues
+    RecipeManagementSummary:
+      type: object
+      properties:
+        totalRecipes:
+          type: integer
+        statusBreakdown:
+          type: object
+          properties:
+            APPROVED:
+              type: integer
+            PENDING:
+              type: integer
+            REJECTED:
+              type: integer
+            DRAFT:
+              type: integer
+        pendingReviewCount:
+          type: integer
+        avgReviewTime:
+          type: number
+          format: float
+          description: Average review time in hours
+        flaggedRecipesCount:
+          type: integer
+        systemRecipesCount:
+          type: integer
+        qualityMetrics:
+          type: object
+          properties:
+            avgQualityScore:
+              type: number
+              format: float
+            approvalRate:
+              type: number
+              format: float
+            resubmissionRate:
+              type: number
+              format: float
+

@@ -1,0 +1,2067 @@
+openapi: 3.1.0
+info:
+  title: Recipe Management System API
+  description: |
+    API cho Hệ thống Quản lý Công thức Nấu ăn
+
+    Hệ thống cung cấp các chức năng:
+    - Quản lý người dùng và phân quyền
+    - Quản lý công thức nấu ăn
+    - Tìm kiếm và gợi ý công thức
+    - Quản lý nguyên liệu và danh mục
+    - Báo cáo và thống kê
+  version: 1.0.0
+  contact:
+    name: DATN Team
+    email: support@recipemanagement.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+  - url: https://api.recipemanagement.com/v1
+    description: Production server
+  - url: https://staging-api.recipemanagement.com/v1
+    description: Staging server
+  - url: http://localhost:3000/api/v1
+    description: Development server
+tags:
+  - name: Authentication
+    description: Xác thực và quản lý phiên đăng nhập
+  - name: User Management
+    description: Quản lý thông tin người dùng
+  - name: Recipe Search
+    description: Tìm kiếm và gợi ý công thức
+  - name: Recipe Management
+    description: Quản lý công thức cá nhân
+  - name: Social Features
+    description: Tính năng xã hội (đánh giá, yêu thích)
+  - name: Collections
+    description: Quản lý bộ sưu tập công thức
+  - name: Planning
+    description: Lập kế hoạch bữa ăn
+  - name: Admin - Users
+    description: Quản trị viên - Quản lý người dùng
+  - name: Admin - Recipes
+    description: Quản trị viên - Quản lý công thức hệ thống
+  - name: Admin - Categories
+    description: Quản trị viên - Quản lý danh mục và nguyên liệu
+  - name: Admin - System
+    description: Quản trị viên - Quản lý tài khoản admin
+  - name: Admin - Analytics
+    description: Quản trị viên - Báo cáo thống kê
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: UCS01-1 - Đăng ký tài khoản
+      description: Đăng ký tài khoản người dùng mới
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserRegistration"
+            example:
+              email: user@example.com
+              password: SecurePass123!
+              confirmPassword: SecurePass123!
+              fullName: Nguyễn Văn A
+              phone: "0912345678"
+      responses:
+        "201":
+          description: Đăng ký thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: UCS01-2 - Đăng nhập hệ thống
+      description: Đăng nhập vào hệ thống
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            example:
+              email: user@example.com
+              password: SecurePass123!
+      responses:
+        "200":
+          description: Đăng nhập thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: UCS01-3 - Đăng xuất hệ thống
+      description: Đăng xuất khỏi hệ thống
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Đăng xuất thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /auth/forgot-password:
+    post:
+      tags:
+        - Authentication
+      summary: UCS01-7 - Đặt lại mật khẩu
+      description: Yêu cầu đặt lại mật khẩu
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+              required:
+                - email
+      responses:
+        "200":
+          description: Email đặt lại mật khẩu đã được gửi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+  /users/profile:
+    get:
+      tags:
+        - User Management
+      summary: UCS01-4 - Xem thông tin cá nhân
+      description: Lấy thông tin cá nhân của người dùng
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Thông tin cá nhân
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      tags:
+        - User Management
+      summary: UCS01-5 - Cập nhật thông tin cá nhân
+      description: Cập nhật thông tin cá nhân
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /users/change-password:
+    put:
+      tags:
+        - User Management
+      summary: UCS01-6 - Đổi mật khẩu
+      description: Thay đổi mật khẩu người dùng
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "200":
+          description: Đổi mật khẩu thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /recipes/search:
+    get:
+      tags:
+        - Recipe Search
+      summary: UCS02-1/UCS02-2 - Tìm kiếm công thức
+      description: Tìm kiếm công thức theo nguyên liệu hoặc tên món ăn
+      parameters:
+        - name: q
+          in: query
+          description: Từ khóa tìm kiếm (tên món ăn)
+          schema:
+            type: string
+        - name: ingredients
+          in: query
+          description: Danh sách nguyên liệu (phân cách bằng dấu phẩy)
+          schema:
+            type: string
+        - name: category
+          in: query
+          description: ID danh mục
+          schema:
+            type: integer
+        - name: difficulty
+          in: query
+          description: Độ khó
+          schema:
+            type: string
+            enum:
+              - easy
+              - medium
+              - hard
+        - name: cookingTime
+          in: query
+          description: Thời gian nấu tối đa (phút)
+          schema:
+            type: integer
+        - name: sortBy
+          in: query
+          description: Sắp xếp theo
+          schema:
+            type: string
+            enum:
+              - relevance
+              - rating
+              - cookingTime
+              - createdAt
+            default: relevance
+        - name: order
+          in: query
+          description: Thứ tự sắp xếp
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Kết quả tìm kiếm
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecipeSearchResponse"
+  /recipes/ai-suggest:
+    post:
+      tags:
+        - Recipe Search
+      summary: UCS02-3 - Tạo công thức bằng AI
+      description: Gợi ý công thức dựa trên AI
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AISuggestionRequest"
+      responses:
+        "200":
+          description: Công thức được gợi ý bởi AI
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Recipe"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /recipes/{id}:
+    get:
+      tags:
+        - Recipe Search
+      summary: UCS02-5 - Xem chi tiết công thức
+      description: Xem thông tin chi tiết của một công thức
+      parameters:
+        - $ref: "#/components/parameters/RecipeIdParam"
+      responses:
+        "200":
+          description: Chi tiết công thức
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecipeDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /recipes:
+    post:
+      tags:
+        - Recipe Management
+      summary: UCS03-1 - Thêm công thức mới
+      description: Tạo công thức nấu ăn mới
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRecipeRequest"
+      responses:
+        "201":
+          description: Tạo công thức thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Recipe"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /users/recipes:
+    get:
+      tags:
+        - Recipe Management
+      summary: UCS03-2 - Xem danh sách công thức đã tạo
+      description: Lấy danh sách công thức của người dùng hiện tại
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          description: Trạng thái công thức
+          schema:
+            type: string
+            enum:
+              - draft
+              - published
+              - pending_approval
+              - rejected
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Danh sách công thức của người dùng
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecipeListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /recipes/{id}/edit:
+    put:
+      tags:
+        - Recipe Management
+      summary: UCS03-3 - Chỉnh sửa công thức đã tạo
+      description: Cập nhật thông tin công thức
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RecipeIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRecipeRequest"
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Recipe"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags:
+        - Recipe Management
+      summary: UCS03-4 - Xóa công thức đã tạo
+      description: Xóa công thức của người dùng
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RecipeIdParam"
+      responses:
+        "200":
+          description: Xóa thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /recipes/{id}/rating:
+    post:
+      tags:
+        - Social Features
+      summary: UCS04-1 - Đánh giá công thức
+      description: Đánh giá công thức nấu ăn
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RecipeIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RatingRequest"
+      responses:
+        "201":
+          description: Đánh giá thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rating"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /recipes/{id}/comments:
+    get:
+      tags:
+        - Social Features
+      summary: UCS04-2 - Xem bình luận
+      description: Lấy danh sách bình luận của công thức
+      parameters:
+        - $ref: "#/components/parameters/RecipeIdParam"
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Danh sách bình luận
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentListResponse"
+    post:
+      tags:
+        - Social Features
+      summary: UCS04-3 - Bình luận công thức
+      description: Thêm bình luận cho công thức
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RecipeIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommentRequest"
+      responses:
+        "201":
+          description: Bình luận thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /recipes/{id}/favorite:
+    post:
+      tags:
+        - Social Features
+      summary: UCS04-4 - Yêu thích công thức
+      description: Thêm công thức vào danh sách yêu thích
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RecipeIdParam"
+      responses:
+        "201":
+          description: Đã thêm vào yêu thích
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags:
+        - Social Features
+      summary: UCS04-4 - Bỏ yêu thích công thức
+      description: Xóa công thức khỏi danh sách yêu thích
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RecipeIdParam"
+      responses:
+        "200":
+          description: Đã bỏ yêu thích
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /collections:
+    get:
+      tags:
+        - Collections
+      summary: UCS05-1 - Xem bộ sưu tập
+      description: Lấy danh sách bộ sưu tập của người dùng
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Danh sách bộ sưu tập
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollectionListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Collections
+      summary: UCS05-2 - Tạo bộ sưu tập
+      description: Tạo bộ sưu tập công thức mới
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCollectionRequest"
+      responses:
+        "201":
+          description: Tạo bộ sưu tập thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Collection"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /meal-plans:
+    get:
+      tags:
+        - Planning
+      summary: UCS06-1 - Xem kế hoạch bữa ăn
+      description: Lấy kế hoạch bữa ăn của người dùng
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: date
+          in: query
+          description: Ngày (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: week
+          in: query
+          description: Tuần (YYYY-WW)
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Kế hoạch bữa ăn
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MealPlanResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Planning
+      summary: UCS06-2 - Tạo kế hoạch bữa ăn
+      description: Lập kế hoạch bữa ăn mới
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMealPlanRequest"
+      responses:
+        "201":
+          description: Tạo kế hoạch thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MealPlan"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /admin/users:
+    get:
+      tags:
+        - Admin - Users
+      summary: UCA01-1 - Xem danh sách người dùng
+      description: Lấy danh sách tất cả người dùng (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          description: Trạng thái tài khoản
+          schema:
+            type: string
+            enum:
+              - active
+              - inactive
+              - banned
+        - name: role
+          in: query
+          description: Vai trò người dùng
+          schema:
+            type: string
+            enum:
+              - user
+              - admin
+              - moderator
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Danh sách người dùng
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/users/{id}:
+    get:
+      tags:
+        - Admin - Users
+      summary: UCA01-2 - Xem chi tiết người dùng
+      description: Xem thông tin chi tiết người dùng (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID người dùng
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Thông tin chi tiết người dùng
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/users/{id}/deactivate:
+    put:
+      tags:
+        - Admin - Users
+      summary: UCA01-3 - Vô hiệu hóa tài khoản người dùng
+      description: Vô hiệu hóa tài khoản người dùng (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeactivateUserRequest"
+      responses:
+        "200":
+          description: Vô hiệu hóa thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/recipes/system:
+    get:
+      tags:
+        - Admin - Recipes
+      summary: UCA02-1 - Xem danh sách công thức hệ thống
+      description: Quản lý công thức do hệ thống tạo (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum:
+              - published
+              - draft
+              - archived
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Danh sách công thức hệ thống
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecipeListResponse"
+  /admin/recipes/pending:
+    get:
+      tags:
+        - Admin - Recipes
+      summary: UCA02-5 - Xem danh sách công thức chờ duyệt
+      description: Lấy danh sách công thức cần phê duyệt (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Danh sách công thức chờ duyệt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecipeListResponse"
+  /admin/recipes/{id}/approve:
+    put:
+      tags:
+        - Admin - Recipes
+      summary: UCA02-6 - Phê duyệt công thức
+      description: Phê duyệt công thức người dùng gửi lên (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RecipeIdParam"
+      responses:
+        "200":
+          description: Phê duyệt thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+  /admin/categories:
+    get:
+      tags:
+        - Admin - Categories
+      summary: UCA03-1 - Xem danh sách danh mục
+      description: Quản lý danh mục món ăn (Admin)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Danh sách danh mục
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryListResponse"
+    post:
+      tags:
+        - Admin - Categories
+      summary: UCA03-2 - Thêm danh mục mới
+      description: Tạo danh mục mới (Admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCategoryRequest"
+      responses:
+        "201":
+          description: Tạo danh mục thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+  /admin/ingredients:
+    get:
+      tags:
+        - Admin - Categories
+      summary: UCA03-5 - Xem danh sách nguyên liệu
+      description: Quản lý nguyên liệu (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: categoryId
+          in: query
+          schema:
+            type: integer
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Danh sách nguyên liệu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngredientListResponse"
+    post:
+      tags:
+        - Admin - Categories
+      summary: UCA03-6 - Thêm nguyên liệu mới
+      description: Thêm nguyên liệu mới (Admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateIngredientRequest"
+      responses:
+        "201":
+          description: Tạo nguyên liệu thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ingredient"
+  /admin/accounts:
+    get:
+      tags:
+        - Admin - System
+      summary: UCA04-1 - Xem danh sách tài khoản admin
+      description: Quản lý tài khoản admin (Super Admin)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Danh sách admin
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAccountListResponse"
+    post:
+      tags:
+        - Admin - System
+      summary: UCA04-2 - Tạo tài khoản admin mới
+      description: Tạo tài khoản admin mới (Super Admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAdminRequest"
+      responses:
+        "201":
+          description: Tạo admin thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAccount"
+  /admin/analytics:
+    get:
+      tags:
+        - Admin - Analytics
+      summary: UCA05-1 - Xem báo cáo thống kê
+      description: Xem các báo cáo và thống kê hệ thống (Admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum:
+              - users
+              - recipes
+              - engagement
+              - revenue
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum:
+              - day
+              - week
+              - month
+              - year
+            default: month
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Dữ liệu thống kê
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsResponse"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token được lấy từ endpoint login
+  parameters:
+    RecipeIdParam:
+      name: id
+      in: path
+      required: true
+      description: ID của công thức
+      schema:
+        type: integer
+        example: 123
+    PageParam:
+      name: page
+      in: query
+      description: Số trang (bắt đầu từ 1)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      description: Số lượng item trên mỗi trang
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  schemas:
+    UserRegistration:
+      type: object
+      required:
+        - email
+        - password
+        - confirmPassword
+        - fullName
+      properties:
+        email:
+          type: string
+          format: email
+          description: Địa chỉ email
+        password:
+          type: string
+          minLength: 8
+          description: Mật khẩu (ít nhất 8 ký tự)
+        confirmPassword:
+          type: string
+          description: Xác nhận mật khẩu
+        fullName:
+          type: string
+          minLength: 2
+          description: Họ và tên đầy đủ
+        phone:
+          type: string
+          pattern: ^[0-9]{10,11}$
+          description: Số điện thoại
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            user:
+              $ref: "#/components/schemas/User"
+            token:
+              type: string
+              description: JWT token
+            refreshToken:
+              type: string
+              description: Refresh token
+            expiresIn:
+              type: integer
+              description: Thời gian hết hạn (giây)
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        avatar:
+          type:
+            - string
+            - "null"
+        role:
+          type: string
+          enum:
+            - user
+            - admin
+            - moderator
+        status:
+          type: string
+          enum:
+            - active
+            - inactive
+            - banned
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    UserProfile:
+      allOf:
+        - $ref: "#/components/schemas/User"
+        - type: object
+          properties:
+            phone:
+              type:
+                - string
+                - "null"
+            bio:
+              type:
+                - string
+                - "null"
+            preferences:
+              type: object
+              properties:
+                dietaryRestrictions:
+                  type: array
+                  items:
+                    type: string
+                favoriteCategories:
+                  type: array
+                  items:
+                    type: integer
+            stats:
+              type: object
+              properties:
+                recipesCount:
+                  type: integer
+                followersCount:
+                  type: integer
+                followingCount:
+                  type: integer
+    UpdateProfileRequest:
+      type: object
+      properties:
+        fullName:
+          type: string
+        phone:
+          type: string
+        bio:
+          type: string
+        avatar:
+          type: string
+        preferences:
+          type: object
+    ChangePasswordRequest:
+      type: object
+      required:
+        - currentPassword
+        - newPassword
+        - confirmNewPassword
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
+        confirmNewPassword:
+          type: string
+    Recipe:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        thumbnail:
+          type:
+            - string
+            - "null"
+        category:
+          $ref: "#/components/schemas/Category"
+        difficulty:
+          type: string
+          enum:
+            - easy
+            - medium
+            - hard
+        servings:
+          type: integer
+        cookingTime:
+          type: integer
+          description: Thời gian nấu (phút)
+        preparationTime:
+          type: integer
+          description: Thời gian chuẩn bị (phút)
+        ingredients:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecipeIngredient"
+        instructions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Instruction"
+        nutritionalInfo:
+          $ref: "#/components/schemas/NutritionalInfo"
+        tags:
+          type: array
+          items:
+            type: string
+        author:
+          $ref: "#/components/schemas/User"
+        ratings:
+          type: object
+          properties:
+            average:
+              type: number
+              format: float
+            count:
+              type: integer
+        status:
+          type: string
+          enum:
+            - draft
+            - published
+            - pending_approval
+            - rejected
+            - archived
+        isPublic:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    RecipeDetail:
+      allOf:
+        - $ref: "#/components/schemas/Recipe"
+        - type: object
+          properties:
+            images:
+              type: array
+              items:
+                type: string
+            videos:
+              type: array
+              items:
+                type: string
+            tips:
+              type: array
+              items:
+                type: string
+            relatedRecipes:
+              type: array
+              items:
+                $ref: "#/components/schemas/Recipe"
+    CreateRecipeRequest:
+      type: object
+      required:
+        - title
+        - categoryId
+        - difficulty
+        - servings
+        - cookingTime
+        - ingredients
+        - instructions
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 1000
+        categoryId:
+          type: integer
+        difficulty:
+          type: string
+          enum:
+            - easy
+            - medium
+            - hard
+        servings:
+          type: integer
+          minimum: 1
+        cookingTime:
+          type: integer
+          minimum: 1
+        preparationTime:
+          type: integer
+          minimum: 0
+        ingredients:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/RecipeIngredientInput"
+        instructions:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/InstructionInput"
+        tags:
+          type: array
+          items:
+            type: string
+        nutritionalInfo:
+          $ref: "#/components/schemas/NutritionalInfoInput"
+        isPublic:
+          type: boolean
+          default: true
+    UpdateRecipeRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        categoryId:
+          type: integer
+        difficulty:
+          type: string
+          enum:
+            - easy
+            - medium
+            - hard
+        servings:
+          type: integer
+        cookingTime:
+          type: integer
+        preparationTime:
+          type: integer
+        ingredients:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecipeIngredientInput"
+        instructions:
+          type: array
+          items:
+            $ref: "#/components/schemas/InstructionInput"
+        tags:
+          type: array
+          items:
+            type: string
+        nutritionalInfo:
+          $ref: "#/components/schemas/NutritionalInfoInput"
+        isPublic:
+          type: boolean
+    RecipeIngredient:
+      type: object
+      properties:
+        ingredient:
+          $ref: "#/components/schemas/Ingredient"
+        quantity:
+          type: number
+          format: float
+        unit:
+          type: string
+        notes:
+          type:
+            - string
+            - "null"
+    RecipeIngredientInput:
+      type: object
+      required:
+        - ingredientId
+        - quantity
+        - unit
+      properties:
+        ingredientId:
+          type: integer
+        quantity:
+          type: number
+          format: float
+        unit:
+          type: string
+        notes:
+          type: string
+    Instruction:
+      type: object
+      properties:
+        stepNumber:
+          type: integer
+        description:
+          type: string
+        image:
+          type:
+            - string
+            - "null"
+        estimatedTime:
+          type:
+            - integer
+            - "null"
+    InstructionInput:
+      type: object
+      required:
+        - stepNumber
+        - description
+      properties:
+        stepNumber:
+          type: integer
+        description:
+          type: string
+        image:
+          type: string
+        estimatedTime:
+          type: integer
+    NutritionalInfo:
+      type: object
+      properties:
+        calories:
+          type:
+            - number
+            - "null"
+          format: float
+        protein:
+          type:
+            - number
+            - "null"
+          format: float
+        carbs:
+          type:
+            - number
+            - "null"
+          format: float
+        fat:
+          type:
+            - number
+            - "null"
+          format: float
+        fiber:
+          type:
+            - number
+            - "null"
+          format: float
+        sugar:
+          type:
+            - number
+            - "null"
+          format: float
+    NutritionalInfoInput:
+      type: object
+      properties:
+        calories:
+          type: number
+          format: float
+        protein:
+          type: number
+          format: float
+        carbs:
+          type: number
+          format: float
+        fat:
+          type: number
+          format: float
+        fiber:
+          type: number
+          format: float
+        sugar:
+          type: number
+          format: float
+    RecipeSearchResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            recipes:
+              type: array
+              items:
+                $ref: "#/components/schemas/Recipe"
+            pagination:
+              $ref: "#/components/schemas/Pagination"
+            filters:
+              type: object
+              properties:
+                availableCategories:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Category"
+                difficultyOptions:
+                  type: array
+                  items:
+                    type: string
+    AISuggestionRequest:
+      type: object
+      required:
+        - ingredients
+      properties:
+        ingredients:
+          type: array
+          items:
+            type: string
+          description: Danh sách nguyên liệu có sẵn
+        preferences:
+          type: object
+          properties:
+            difficulty:
+              type: string
+              enum:
+                - easy
+                - medium
+                - hard
+            cookingTime:
+              type: integer
+            category:
+              type: string
+            dietaryRestrictions:
+              type: array
+              items:
+                type: string
+    Rating:
+      type: object
+      properties:
+        id:
+          type: integer
+        user:
+          $ref: "#/components/schemas/User"
+        recipeId:
+          type: integer
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        review:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+    RatingRequest:
+      type: object
+      required:
+        - rating
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        review:
+          type: string
+          maxLength: 1000
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+        user:
+          $ref: "#/components/schemas/User"
+        content:
+          type: string
+        parentId:
+          type:
+            - integer
+            - "null"
+        replies:
+          type: array
+          items:
+            $ref: "#/components/schemas/Comment"
+        createdAt:
+          type: string
+          format: date-time
+    CommentRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 500
+        parentId:
+          type:
+            - integer
+            - "null"
+    CommentListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            comments:
+              type: array
+              items:
+                $ref: "#/components/schemas/Comment"
+            pagination:
+              $ref: "#/components/schemas/Pagination"
+    Collection:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type:
+            - string
+            - "null"
+        thumbnail:
+          type:
+            - string
+            - "null"
+        isPublic:
+          type: boolean
+        recipesCount:
+          type: integer
+        user:
+          $ref: "#/components/schemas/User"
+        createdAt:
+          type: string
+          format: date-time
+    CreateCollectionRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        isPublic:
+          type: boolean
+          default: false
+    CollectionListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            collections:
+              type: array
+              items:
+                $ref: "#/components/schemas/Collection"
+            pagination:
+              $ref: "#/components/schemas/Pagination"
+    MealPlan:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        date:
+          type: string
+          format: date
+        meals:
+          type: array
+          items:
+            $ref: "#/components/schemas/MealPlanEntry"
+        createdAt:
+          type: string
+          format: date-time
+    MealPlanEntry:
+      type: object
+      properties:
+        mealType:
+          type: string
+          enum:
+            - breakfast
+            - lunch
+            - dinner
+            - snack
+        recipe:
+          $ref: "#/components/schemas/Recipe"
+        servings:
+          type: integer
+        notes:
+          type:
+            - string
+            - "null"
+    CreateMealPlanRequest:
+      type: object
+      required:
+        - date
+        - meals
+      properties:
+        date:
+          type: string
+          format: date
+        meals:
+          type: array
+          items:
+            type: object
+            required:
+              - mealType
+              - recipeId
+              - servings
+            properties:
+              mealType:
+                type: string
+                enum:
+                  - breakfast
+                  - lunch
+                  - dinner
+                  - snack
+              recipeId:
+                type: integer
+              servings:
+                type: integer
+              notes:
+                type: string
+    MealPlanResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            mealPlans:
+              type: array
+              items:
+                $ref: "#/components/schemas/MealPlan"
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type:
+            - string
+            - "null"
+        image:
+          type:
+            - string
+            - "null"
+        parentId:
+          type:
+            - integer
+            - "null"
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+        recipesCount:
+          type: integer
+    CreateCategoryRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        parentId:
+          type: integer
+    CategoryListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+    Ingredient:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        category:
+          type:
+            - string
+            - "null"
+        unit:
+          type: string
+        nutritionalInfo:
+          $ref: "#/components/schemas/NutritionalInfo"
+    CreateIngredientRequest:
+      type: object
+      required:
+        - name
+        - unit
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        category:
+          type: string
+        unit:
+          type: string
+        nutritionalInfo:
+          $ref: "#/components/schemas/NutritionalInfoInput"
+    IngredientListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            ingredients:
+              type: array
+              items:
+                $ref: "#/components/schemas/Ingredient"
+            pagination:
+              $ref: "#/components/schemas/Pagination"
+    AdminUserDetail:
+      allOf:
+        - $ref: "#/components/schemas/UserProfile"
+        - type: object
+          properties:
+            loginHistory:
+              type: array
+              items:
+                type: object
+                properties:
+                  timestamp:
+                    type: string
+                    format: date-time
+                  ipAddress:
+                    type: string
+                  userAgent:
+                    type: string
+            violationHistory:
+              type: array
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                  description:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+    AdminUserListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            users:
+              type: array
+              items:
+                $ref: "#/components/schemas/User"
+            pagination:
+              $ref: "#/components/schemas/Pagination"
+            stats:
+              type: object
+              properties:
+                totalUsers:
+                  type: integer
+                activeUsers:
+                  type: integer
+                newUsersThisMonth:
+                  type: integer
+    DeactivateUserRequest:
+      type: object
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 500
+        duration:
+          type:
+            - integer
+            - "null"
+          description: Thời gian khóa (ngày), null = vĩnh viễn
+    AdminAccount:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        fullName:
+          type: string
+        role:
+          type: string
+          enum:
+            - admin
+            - moderator
+            - super_admin
+        permissions:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastLogin:
+          type:
+            - string
+            - "null"
+          format: date-time
+    CreateAdminRequest:
+      type: object
+      required:
+        - email
+        - fullName
+        - role
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        role:
+          type: string
+          enum:
+            - admin
+            - moderator
+        password:
+          type: string
+          minLength: 8
+        permissions:
+          type: array
+          items:
+            type: string
+    AdminAccountListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminAccount"
+    AnalyticsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            summary:
+              type: object
+              additionalProperties: true
+            chartData:
+              type: array
+              items:
+                type: object
+                properties:
+                  date:
+                    type: string
+                  value:
+                    type: number
+            topItems:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+    RecipeListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            recipes:
+              type: array
+              items:
+                $ref: "#/components/schemas/Recipe"
+            pagination:
+              $ref: "#/components/schemas/Pagination"
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+        hasNext:
+          type: boolean
+        hasPrevious:
+          type: boolean
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Operation completed successfully
+        data:
+          type:
+            - object
+            - "null"
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type:
+                - object
+                - "null"
+  responses:
+    BadRequest:
+      description: Yêu cầu không hợp lệ
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: BAD_REQUEST
+              message: Dữ liệu đầu vào không hợp lệ
+    Unauthorized:
+      description: Chưa xác thực hoặc token không hợp lệ
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: UNAUTHORIZED
+              message: Vui lòng đăng nhập để tiếp tục
+    Forbidden:
+      description: Không có quyền truy cập
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: FORBIDDEN
+              message: Bạn không có quyền thực hiện hành động này
+    NotFound:
+      description: Không tìm thấy tài nguyên
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: NOT_FOUND
+              message: Không tìm thấy tài nguyên yêu cầu
+    Conflict:
+      description: Xung đột dữ liệu
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: CONFLICT
+              message: Dữ liệu đã tồn tại
+    InternalServerError:
+      description: Lỗi máy chủ nội bộ
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: INTERNAL_SERVER_ERROR
+              message: Đã xảy ra lỗi không mong muốn
+security:
+  - bearerAuth: []

@@ -1,0 +1,844 @@
+paths:
+  /collections:
+    get:
+      tags:
+        - Collections
+      summary: UCS05-1 - Get user's collections
+      description: |
+        Get paginated list of collections owned by current user.
+        Includes collection statistics and preview recipes.
+
+        **Business Rules:**
+        - Shows only collections owned by current user
+        - Includes recipe count and preview thumbnails
+        - Supports filtering by public/private status
+        - Default sort by updatedAt (most recently updated first)
+
+        **ERD Entities:** COLLECTION, RECIPE (for previews)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: visibility
+          in: query
+          description: Filter by collection visibility
+          schema:
+            type: string
+            enum:
+              - public
+              - private
+              - all
+            default: all
+        - name: sortBy
+          in: query
+          description: Sort collections by
+          schema:
+            type: string
+            enum:
+              - createdAt
+              - updatedAt
+              - name
+              - recipesCount
+            default: updatedAt
+        - name: order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+        - $ref: ../components.yaml#/components/parameters/PageParam
+        - $ref: ../components.yaml#/components/parameters/LimitParam
+      responses:
+        "200":
+          description: Collections retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/CollectionListResponse
+              example:
+                success: true
+                data:
+                  collections:
+                    - id: col-123e4567-e89b-12d3-a456-426614174000
+                      name: Món Chay Yêu Thích
+                      description: Tuyển tập các món chay ngon và bổ dưỡng
+                      isPublic: false
+                      recipesCount: 15
+                      thumbnailUrl: https://example.com/collections/col123-thumb.jpg
+                      createdAt: 2024-01-10T10:00:00Z
+                      updatedAt: 2024-01-20T15:30:00Z
+                      previewRecipes:
+                        - id: rec1
+                          name: Đậu hũ sốt cà
+                          thumbnailUrl: https://example.com/recipes/rec1-thumb.jpg
+                  pagination:
+                    page: 1
+                    limit: 20
+                    total: 8
+                    totalPages: 1
+                    hasNext: false
+                    hasPrevious: false
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+      operationId: getCollections
+    post:
+      tags:
+        - Collections
+      summary: UCS05-2 - Create new collection
+      description: |
+        Create a new recipe collection.
+        Collection starts empty and recipes can be added later.
+
+        **Business Rules:**
+        - User must be authenticated
+        - Collection name must be unique per user
+        - Default visibility is private
+        - Can optionally add initial recipes during creation
+
+        **ERD Entities:** COLLECTION
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../components.yaml#/components/schemas/CreateCollectionRequest
+            example:
+              name: Món Ăn Đặc Sản Miền Bắc
+              description: Sưu tập các món ăn truyền thống đặc sắc của miền Bắc Việt Nam
+              isPublic: false
+              thumbnailUrl: https://example.com/my-collection-cover.jpg
+      responses:
+        "201":
+          description: Collection created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: ../components.yaml#/components/schemas/Collection
+              example:
+                success: true
+                data:
+                  id: col-987fcdeb-51d2-43a1-b234-567890123456
+                  name: Món Ăn Đặc Sản Miền Bắc
+                  description: Sưu tập các món ăn truyền thống đặc sắc của miền Bắc Việt Nam
+                  isPublic: false
+                  userId: 123e4567-e89b-12d3-a456-426614174000
+                  recipesCount: 0
+                  createdAt: 2024-01-15T10:30:00Z
+                  updatedAt: 2024-01-15T10:30:00Z
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              examples:
+                duplicate_name:
+                  summary: Collection name already exists
+                  value:
+                    success: false
+                    error:
+                      code: DUPLICATE_COLLECTION_NAME
+                      message: You already have a collection with this name
+                      details:
+                        field: name
+                        existingId: col-456e7890-a12b-34c5-d678-901234567890
+                name_too_long:
+                  summary: Name too long
+                  value:
+                    success: false
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Collection name cannot exceed 100 characters
+                      details:
+                        field: name
+                        maxLength: 100
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+      operationId: createCollections
+  /collections/{collectionId}:
+    get:
+      tags:
+        - Collections
+      summary: Get collection details
+      description: |
+        Get detailed information about a collection including recipes.
+        Supports both owner and public access based on visibility.
+
+        **Business Rules:**
+        - Public collections can be viewed by anyone
+        - Private collections only by owner
+        - Returns paginated recipe list within collection
+
+        **ERD Entities:** COLLECTION, RECIPE (collection members)
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/CollectionIdParam
+        - name: includeRecipes
+          in: query
+          description: Include recipes in response
+          schema:
+            type: boolean
+            default: true
+        - $ref: ../components.yaml#/components/parameters/PageParam
+        - $ref: ../components.yaml#/components/parameters/LimitParam
+      responses:
+        "200":
+          description: Collection details retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    allOf:
+                      - $ref: ../components.yaml#/components/schemas/Collection
+                      - type: object
+                        properties:
+                          recipes:
+                            type: array
+                            items:
+                              $ref: ../components.yaml#/components/schemas/Recipe
+                            description: Recipes in collection (if includeRecipes=true)
+                          pagination:
+                            $ref: ../components.yaml#/components/schemas/Pagination
+                            description: Recipe pagination (if includeRecipes=true)
+                          owner:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                                format: uuid
+                              displayName:
+                                type: string
+                              avatarUrl:
+                                type:
+                                  - string
+                                  - "null"
+                                format: uri
+                          canEdit:
+                            type: boolean
+                            description: Whether current user can edit this collection
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          description: Private collection access denied
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              example:
+                success: false
+                error:
+                  code: PRIVATE_COLLECTION
+                  message: This collection is private and cannot be viewed
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: getCollectionsByid
+    put:
+      tags:
+        - Collections
+      summary: Update collection
+      description: |
+        Update collection information (name, description, visibility).
+        Only collection owner can update.
+
+        **Business Rules:**
+        - Only owner can update collection
+        - Name must remain unique per user
+        - Can change visibility from private to public or vice versa
+
+        **ERD Entities:** COLLECTION
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/CollectionIdParam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                description:
+                  type:
+                    - string
+                    - "null"
+                  maxLength: 500
+                isPublic:
+                  type: boolean
+                thumbnailUrl:
+                  type:
+                    - string
+                    - "null"
+                  format: uri
+            example:
+              name: Món Ăn Miền Bắc Đặc Sắc
+              description: Phiên bản cập nhật với thêm nhiều món ngon
+              isPublic: true
+      responses:
+        "200":
+          description: Collection updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: ../components.yaml#/components/schemas/Collection
+        "400":
+          $ref: ../components.yaml#/components/responses/BadRequest
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: updateCollectionsByid
+    delete:
+      tags:
+        - Collections
+      summary: Delete collection
+      description: |
+        Delete a collection permanently.
+        Only collection owner can delete.
+
+        **Business Rules:**
+        - Only owner can delete collection
+        - Requires confirmation (query parameter)
+        - Hard delete - cannot be recovered
+        - Does not affect recipes, only removes collection relationship
+
+        **ERD Entities:** COLLECTION
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/CollectionIdParam
+        - name: confirmDelete
+          in: query
+          required: true
+          description: Confirmation flag (must be true)
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Collection deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/SuccessResponse
+              example:
+                success: true
+                message: Collection deleted successfully
+        "400":
+          description: Missing confirmation
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              example:
+                success: false
+                error:
+                  code: CONFIRMATION_REQUIRED
+                  message: Delete confirmation required (confirmDelete=true)
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: deleteCollectionsByid
+  /collections/{collectionId}/recipes:
+    get:
+      tags:
+        - Collections
+      summary: Get recipes in collection
+      description: |
+        Get paginated list of recipes in a specific collection.
+        Supports filtering and sorting within the collection.
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/CollectionIdParam
+        - name: category
+          in: query
+          description: Filter by recipe category
+          schema:
+            type: string
+            format: uuid
+        - $ref: ../components.yaml#/components/parameters/DifficultyParam
+        - name: sortBy
+          in: query
+          description: Sort recipes by
+          schema:
+            type: string
+            enum:
+              - addedAt
+              - recipeName
+              - recipeRating
+              - cookTime
+            default: addedAt
+        - name: order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+        - $ref: ../components.yaml#/components/parameters/PageParam
+        - $ref: ../components.yaml#/components/parameters/LimitParam
+      responses:
+        "200":
+          description: Collection recipes retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      recipes:
+                        type: array
+                        items:
+                          type: object
+                          allOf:
+                            - $ref: ../components.yaml#/components/schemas/Recipe
+                            - type: object
+                              properties:
+                                addedAt:
+                                  type: string
+                                  format: date-time
+                                  description: When recipe was added to collection
+                                addedBy:
+                                  type: string
+                                  format: uuid
+                                  description: User who added recipe to collection
+                      pagination:
+                        $ref: ../components.yaml#/components/schemas/Pagination
+                      collectionInfo:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          name:
+                            type: string
+                          canEdit:
+                            type: boolean
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: getCollectionsByidRecipes
+    post:
+      tags:
+        - Collections
+      summary: Add recipes to collection
+      description: |
+        Add one or more recipes to a collection.
+        Only collection owner can add recipes.
+
+        **Business Rules:**
+        - Only collection owner can add recipes
+        - Recipes must be APPROVED status
+        - Cannot add duplicate recipes
+        - Can add multiple recipes in single request
+
+        **ERD Entities:** COLLECTION_RECIPE (junction table)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/CollectionIdParam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                recipeIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  minItems: 1
+                  maxItems: 50
+                  description: Recipe IDs to add
+                notes:
+                  type:
+                    - string
+                    - "null"
+                  maxLength: 500
+                  description: Optional notes about addition
+              required:
+                - recipeIds
+            example:
+              recipeIds:
+                - 987fcdeb-51d2-43a1-b234-567890123456
+                - 456e7890-a12b-34c5-d678-901234567890
+              notes: Added these family favorites
+      responses:
+        "201":
+          description: Recipes added to collection successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      addedCount:
+                        type: integer
+                        example: 2
+                      skippedCount:
+                        type: integer
+                        example: 0
+                        description: Recipes already in collection
+                      newRecipesCount:
+                        type: integer
+                        example: 17
+                        description: Total recipes in collection after addition
+                      addedRecipes:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            recipeId:
+                              type: string
+                              format: uuid
+                            recipeName:
+                              type: string
+                            addedAt:
+                              type: string
+                              format: date-time
+                      skippedRecipes:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            recipeId:
+                              type: string
+                              format: uuid
+                            reason:
+                              type: string
+                        description: Recipes that were not added and why
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              examples:
+                recipe_not_found:
+                  summary: Some recipes not found
+                  value:
+                    success: false
+                    error:
+                      code: RECIPES_NOT_FOUND
+                      message: Some recipes could not be found or are not approved
+                      details:
+                        notFound:
+                          - 456e7890-a12b-34c5-d678-901234567890
+                too_many_recipes:
+                  summary: Too many recipes
+                  value:
+                    success: false
+                    error:
+                      code: TOO_MANY_RECIPES
+                      message: Cannot add more than 50 recipes at once
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: createCollectionsByidRecipes
+  /collections/{collectionId}/recipes/{recipeId}:
+    delete:
+      tags:
+        - Collections
+      summary: Remove recipe from collection
+      description: |
+        Remove a specific recipe from collection.
+        Only collection owner can remove recipes.
+
+        **Business Rules:**
+        - Only collection owner can remove recipes
+        - Updates collection's recipesCount
+        - Updates collection's updatedAt timestamp
+
+        **ERD Entities:** COLLECTION_RECIPE (junction table)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/CollectionIdParam
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+      responses:
+        "200":
+          description: Recipe removed from collection successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      removedRecipe:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          name:
+                            type: string
+                          removedAt:
+                            type: string
+                            format: date-time
+                      newRecipesCount:
+                        type: integer
+                        example: 16
+                        description: Total recipes remaining in collection
+              example:
+                success: true
+                data:
+                  removedRecipe:
+                    id: 987fcdeb-51d2-43a1-b234-567890123456
+                    name: Thịt Kho Tàu
+                    removedAt: 2024-01-15T10:30:00Z
+                  newRecipesCount: 16
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          description: Recipe not in collection or collection not found
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              examples:
+                recipe_not_in_collection:
+                  summary: Recipe not in collection
+                  value:
+                    success: false
+                    error:
+                      code: RECIPE_NOT_IN_COLLECTION
+                      message: This recipe is not in the specified collection
+                collection_not_found:
+                  summary: Collection not found
+                  value:
+                    success: false
+                    error:
+                      code: COLLECTION_NOT_FOUND
+                      message: Collection not found
+      operationId: deleteCollectionsByidRecipesByid
+components:
+  schemas:
+    CollectionWithRecipes:
+      allOf:
+        - $ref: ../components.yaml#/components/schemas/Collection
+        - type: object
+          properties:
+            recipes:
+              type: array
+              items:
+                $ref: "#/components/schemas/CollectionRecipe"
+            pagination:
+              $ref: ../components.yaml#/components/schemas/Pagination
+    CollectionRecipe:
+      allOf:
+        - $ref: ../components.yaml#/components/schemas/Recipe
+        - type: object
+          properties:
+            addedAt:
+              type: string
+              format: date-time
+              description: When recipe was added to collection
+            addedBy:
+              type: string
+              format: uuid
+              description: User who added recipe
+            position:
+              type:
+                - integer
+                - "null"
+              description: Manual ordering position in collection
+    CollectionPreview:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        recipesCount:
+          type: integer
+        thumbnailUrl:
+          type:
+            - string
+            - "null"
+          format: uri
+        isPublic:
+          type: boolean
+        previewRecipes:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+              thumbnailUrl:
+                type:
+                  - string
+                  - "null"
+                format: uri
+          maxItems: 4
+          description: Up to 4 preview recipes for display
+      required:
+        - id
+        - name
+        - recipesCount
+        - isPublic
+    AddRecipesResult:
+      type: object
+      properties:
+        addedCount:
+          type: integer
+          description: Number of recipes successfully added
+        skippedCount:
+          type: integer
+          description: Number of recipes skipped (already in collection)
+        newRecipesCount:
+          type: integer
+          description: Total recipes in collection after operation
+        addedRecipes:
+          type: array
+          items:
+            type: object
+            properties:
+              recipeId:
+                type: string
+                format: uuid
+              recipeName:
+                type: string
+              addedAt:
+                type: string
+                format: date-time
+        skippedRecipes:
+          type: array
+          items:
+            type: object
+            properties:
+              recipeId:
+                type: string
+                format: uuid
+              recipeName:
+                type: string
+              reason:
+                type: string
+                enum:
+                  - ALREADY_IN_COLLECTION
+                  - NOT_FOUND
+                  - NOT_APPROVED
+                  - ACCESS_DENIED
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              recipeId:
+                type: string
+                format: uuid
+              error:
+                type: string
+          description: Recipes that failed to be added with error details
+      required:
+        - addedCount
+        - skippedCount
+        - newRecipesCount
+    CollectionStats:
+      type: object
+      properties:
+        totalCollections:
+          type: integer
+        publicCollections:
+          type: integer
+        privateCollections:
+          type: integer
+        totalRecipesInCollections:
+          type: integer
+        avgRecipesPerCollection:
+          type: number
+          format: float
+        mostPopularCollection:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            recipesCount:
+              type: integer
+        recentActivity:
+          type: array
+          items:
+            type: object
+            properties:
+              action:
+                type: string
+                enum:
+                  - CREATED
+                  - UPDATED
+                  - RECIPE_ADDED
+                  - RECIPE_REMOVED
+              collectionId:
+                type: string
+                format: uuid
+              collectionName:
+                type: string
+              timestamp:
+                type: string
+                format: date-time
+              details:
+                type:
+                  - object
+                  - "null"
+

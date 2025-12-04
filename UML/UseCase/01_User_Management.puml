@@ -1,0 +1,64 @@
+@startuml User_Management
+title Use Case Diagram: User Management (UC-A1)
+
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam shadowing false
+skinparam backgroundColor white
+
+left to right direction
+
+actor "Admin" as Admin #FFA500
+actor "Super Admin" as SuperAdmin #FF6B6B
+
+rectangle "User Management System" {
+  usecase "UCA01-1\nView User List" as UC1 #E0F0FF
+  usecase "UCA01-2\nView User Details" as UC2 #E0F0FF
+  usecase "UCA01-3\nDisable User Account" as UC3 #FFE4B5
+  usecase "UCA01-4\nEnable User Account" as UC4 #FFE4B5
+}
+
+Admin --> UC1
+Admin --> UC2
+Admin --> UC3
+Admin --> UC4
+
+SuperAdmin --> UC1
+SuperAdmin --> UC2
+SuperAdmin --> UC3
+SuperAdmin --> UC4
+
+' Relationships
+UC3 ..> UC2 : <<include>>
+UC4 ..> UC2 : <<include>>
+
+note right of UC1
+  Search by name/email
+  Filter by status
+  Sort and paginate
+end note
+
+note right of UC2
+  View profile details
+  Activity statistics
+  Recipe history
+end note
+
+note right of UC3
+  Disable with reason
+  Set duration
+  Full session logout
+  Audit trail
+end note
+
+note right of UC4
+  Enable disabled account
+  Auto-enable after expiry
+  Audit trail
+end note
+
+@enduml
+
+
+
+

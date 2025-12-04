@@ -1,0 +1,71 @@
+@startuml Analytics_Reporting
+title Use Case Diagram: Analytics & Reporting (UC-A5)
+
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam shadowing false
+skinparam backgroundColor white
+
+left to right direction
+
+actor "Super Admin" as SuperAdmin #FF6B6B
+actor "Admin" as Admin #FFA500
+
+rectangle "Analytics & Reporting System" {
+  usecase "UCA05-1\nView Analytics Dashboard" as UC1 #FFB6C1
+  
+  package "Dashboard Features" {
+    usecase "View KPIs" as KPI #FFE4B5
+    usecase "View Line Chart\n(Growth)" as Line #FFE4B5
+    usecase "View Bar Chart\n(New Recipes)" as Bar #FFE4B5
+    usecase "View Pie Chart\n(Status)" as Pie #FFE4B5
+    usecase "View Heatmap\n(Activity)" as Heat #FFE4B5
+    usecase "Drill-down Details" as Drill #FFE4B5
+  }
+  
+  package "Reporting Features" {
+    usecase "Export PDF Report" as PDF #FFE4B5
+    usecase "Export CSV Data" as CSV #FFE4B5
+    usecase "Save Report Preset" as Preset #FFE4B5
+  }
+}
+
+SuperAdmin --> UC1
+Admin --> UC1
+
+UC1 ..> KPI : <<include>>
+UC1 ..> Line : <<include>>
+UC1 ..> Bar : <<include>>
+UC1 ..> Pie : <<include>>
+UC1 ..> Heat : <<include>>
+UC1 ..> Drill : <<extend>>
+
+UC1 ..> PDF : <<extend>>
+UC1 ..> CSV : <<extend>>
+UC1 ..> Preset : <<extend>>
+
+note right of UC1
+  **HIGH PRIORITY**
+  Main dashboard interface
+  Real-time data updates
+  Interactive visualization
+end note
+
+note right of KPI
+  User count
+  Recipe count
+  Approval rate
+  Engagement metrics
+end note
+
+note right of PDF
+  Generate custom reports
+  Include charts and KPIs
+  Scheduled delivery
+end note
+
+@enduml
+
+
+
+

@@ -1,0 +1,131 @@
+paths:
+  /admin/analytics/overview:
+    get:
+      tags:
+        - Admin - Analytics
+      summary: UCA05-1 - System overview analytics
+      description: |
+        Get comprehensive system analytics overview with key metrics.
+
+        **ERD Entities:** Multiple entities for aggregated statistics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum:
+              - day
+              - week
+              - month
+              - year
+            default: month
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Analytics overview retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/AnalyticsResponse
+      operationId: getAdminAnalyticsOverview
+  /admin/analytics/users:
+    get:
+      tags:
+        - Admin - Analytics
+      summary: User analytics and statistics
+      description: Detailed user metrics and growth analytics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum:
+              - growth
+              - engagement
+              - retention
+              - demographics
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum:
+              - day
+              - week
+              - month
+              - year
+            default: month
+      responses:
+        "200":
+          description: User analytics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/AnalyticsResponse
+      operationId: getAdminAnalyticsUsers
+  /admin/analytics/recipes:
+    get:
+      tags:
+        - Admin - Analytics
+      summary: Recipe analytics and performance
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum:
+              - creation
+              - approval
+              - engagement
+              - categories
+      responses:
+        "200":
+          description: Recipe analytics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/AnalyticsResponse
+      operationId: getAdminAnalyticsRecipes
+  /admin/analytics/engagement:
+    get:
+      tags:
+        - Admin - Analytics
+      summary: User engagement analytics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum:
+              - comments
+              - ratings
+              - favorites
+              - sharing
+      responses:
+        "200":
+          description: Engagement analytics retrieved
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/AnalyticsResponse
+      operationId: getAdminAnalyticsEngagement
+

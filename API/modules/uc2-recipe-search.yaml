@@ -1,0 +1,730 @@
+paths:
+  /recipes/search:
+    get:
+      tags:
+        - Recipe Search
+      summary: UCS02-2 - Search recipes by name
+      description: |
+        Search recipes by name/title with fuzzy matching and full-text search.
+        Supports Vietnamese text search with similarity scoring.
+
+        **Business Rules:**
+        - Only searches APPROVED recipes (status = 'APPROVED')
+        - Uses full-text search with Vietnamese language support
+        - Results sorted by relevance score by default
+        - Supports filtering and sorting options
+
+        **ERD Entities:** RECIPE, USER, CATEGORY
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query (recipe name/title)
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+          example: thịt kho tàu
+        - name: category
+          in: query
+          description: Filter by category ID
+          schema:
+            type: string
+            format: uuid
+        - $ref: ../components.yaml#/components/parameters/DifficultyParam
+        - name: maxCookTime
+          in: query
+          description: Maximum cooking time in minutes
+          schema:
+            type: integer
+            minimum: 1
+            example: 60
+        - name: minRating
+          in: query
+          description: Minimum average rating (1-5)
+          schema:
+            type: number
+            format: float
+            minimum: 1
+            maximum: 5
+            example: 4
+        - name: sortBy
+          in: query
+          description: Sort results by
+          schema:
+            type: string
+            enum:
+              - relevance
+              - rating
+              - views
+              - createdAt
+              - cookTime
+            default: relevance
+        - name: order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+        - $ref: ../components.yaml#/components/parameters/PageParam
+        - $ref: ../components.yaml#/components/parameters/LimitParam
+      responses:
+        "200":
+          description: Search results found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      recipes:
+                        type: array
+                        items:
+                          $ref: ../components.yaml#/components/schemas/Recipe
+                      pagination:
+                        $ref: ../components.yaml#/components/schemas/Pagination
+                      filters:
+                        type: object
+                        properties:
+                          availableCategories:
+                            type: array
+                            items:
+                              $ref: ../components.yaml#/components/schemas/Category
+                          difficultyCount:
+                            type: object
+                            example:
+                              EASY: 45
+                              MEDIUM: 32
+                              HARD: 18
+                          avgCookTime:
+                            type: number
+                            format: float
+                            example: 45.5
+              example:
+                success: true
+                data:
+                  recipes: []
+                  pagination:
+                    page: 1
+                    limit: 20
+                    total: 95
+                    totalPages: 5
+                    hasNext: true
+                    hasPrevious: false
+                  filters:
+                    availableCategories: []
+                    difficultyCount:
+                      EASY: 45
+                      MEDIUM: 32
+                      HARD: 18
+        "400":
+          $ref: ../components.yaml#/components/responses/BadRequest
+      operationId: getRecipesSearch
+  /recipes/search/by-ingredients:
+    post:
+      tags:
+        - Recipe Search
+      summary: UCS02-1 - Search recipes by available ingredients
+      description: |
+        Search recipes using available ingredients with 3-tier priority algorithm:
+        - Priority 1: Recipes containing ALL provided ingredients
+        - Priority 2: Recipes containing N-1 ingredients (high match)
+        - Priority 3: Recipes needing only 1-2 additional common ingredients
+
+        **Business Rules:**
+        - Only searches APPROVED recipes
+        - Implements sophisticated ingredient matching algorithm
+        - Returns suggestions for missing ingredients
+        - Results ranked by ingredient match percentage
+
+        **ERD Entities:** RECIPE, INGREDIENT, USER
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ingredients:
+                  type: array
+                  items:
+                    type: string
+                  minItems: 1
+                  maxItems: 20
+                  description: Available ingredients
+                  example:
+                    - thịt bò
+                    - khoai tây
+                    - cà rốt
+                    - hành tây
+                preferences:
+                  type: object
+                  properties:
+                    difficulty:
+                      type: string
+                      enum:
+                        - EASY
+                        - MEDIUM
+                        - HARD
+                    maxCookTime:
+                      type: integer
+                      minimum: 1
+                    category:
+                      type: string
+                      format: uuid
+                    excludeIngredients:
+                      type: array
+                      items:
+                        type: string
+                      description: Ingredients to avoid
+                      example:
+                        - đậu phộng
+                        - sữa
+              required:
+                - ingredients
+            example:
+              ingredients:
+                - thịt bò
+                - khoai tây
+                - cà rốt
+              preferences:
+                difficulty: MEDIUM
+                maxCookTime: 90
+      responses:
+        "200":
+          description: Recipe suggestions found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      recipes:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: ../components.yaml#/components/schemas/Recipe
+                            - type: object
+                              properties:
+                                matchScore:
+                                  type: number
+                                  format: float
+                                  minimum: 0
+                                  maximum: 1
+                                  description: Ingredient match percentage
+                                  example: 0.85
+                                matchedIngredients:
+                                  type: array
+                                  items:
+                                    type: string
+                                  description: Matched ingredients
+                                  example:
+                                    - thịt bò
+                                    - khoai tây
+                                missingIngredients:
+                                  type: array
+                                  items:
+                                    type: string
+                                  description: Additional ingredients needed
+                                  example:
+                                    - nước mắm
+                                    - đường
+                                priority:
+                                  type: integer
+                                  enum:
+                                    - 1
+                                    - 2
+                                    - 3
+                                  description: Priority level (1=highest)
+                                  example: 1
+                      summary:
+                        type: object
+                        properties:
+                          totalResults:
+                            type: integer
+                            example: 47
+                          priorityCounts:
+                            type: object
+                            example:
+                              "1": 12
+                              "2": 23
+                              "3": 12
+                          suggestedIngredients:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name:
+                                  type: string
+                                frequency:
+                                  type: integer
+                                  description: How often this ingredient appears in suggestions
+                            example:
+                              - name: nước mắm
+                                frequency: 35
+                              - name: đường
+                                frequency: 28
+        "400":
+          $ref: ../components.yaml#/components/responses/BadRequest
+      operationId: createRecipesSearchByIngredients
+  /recipes/ai-suggest:
+    post:
+      tags:
+        - Recipe Search
+      summary: UCS02-3 - Generate recipe using AI
+      description: |
+        Generate new recipe using AI when no matching recipes found.
+        Creates temporary recipe entry with 24-hour expiration.
+
+        **Business Rules:**
+        - Triggered when ingredient search returns no results
+        - Calls external AI API (GPT/Claude) with structured prompt
+        - Creates temporary RECIPE entry (status = 'AI_GENERATED')
+        - Auto-expires after 24 hours
+        - User can save to personal recipes
+
+        **ERD Entities:** RECIPE, INGREDIENT, RECIPE_STEP
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../components.yaml#/components/schemas/AISuggestionRequest
+            example:
+              ingredients:
+                - thịt gà
+                - nấm
+                - cà rốt
+              preferences:
+                difficulty: EASY
+                cookingTime: 45
+                category: Món chính
+                dietaryRestrictions:
+                  - halal
+      responses:
+        "200":
+          description: AI recipe generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    allOf:
+                      - $ref: ../components.yaml#/components/schemas/RecipeDetail
+                      - type: object
+                        properties:
+                          isAIGenerated:
+                            type: boolean
+                            example: true
+                          expiresAt:
+                            type: string
+                            format: date-time
+                            description: When this AI recipe expires
+                            example: 2024-01-16T10:30:00Z
+                          aiModel:
+                            type: string
+                            description: AI model used for generation
+                            example: gpt-4
+                          confidence:
+                            type: number
+                            format: float
+                            minimum: 0
+                            maximum: 1
+                            description: AI confidence score
+                            example: 0.89
+              example:
+                success: true
+                data:
+                  id: ai-123e4567-e89b-12d3-a456-426614174000
+                  name: Gà Xào Nấm Cà Rốt
+                  description: Món gà xào đơn giản với nấm và cà rốt, thích hợp cho bữa cơm gia đình
+                  isAIGenerated: true
+                  expiresAt: 2024-01-16T10:30:00Z
+                  confidence: 0.89
+        "400":
+          $ref: ../components.yaml#/components/responses/BadRequest
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "503":
+          description: AI service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              example:
+                success: false
+                error:
+                  code: AI_SERVICE_UNAVAILABLE
+                  message: AI recipe generation is temporarily unavailable
+      operationId: createRecipesAiSuggest
+  /recipes/{recipeId}:
+    get:
+      tags:
+        - Recipe Search
+      summary: UCS02-5 - Get recipe details
+      description: >
+        Get complete recipe details including ingredients, steps, ratings, and comments.
+
+        Increments view count and records view in VIEW_HISTORY.
+
+
+        **Business Rules:**
+
+        - Only shows APPROVED recipes (or user's own recipes)
+
+        - Increments views counter atomically
+
+        - Records view in VIEW_HISTORY for analytics
+
+        - Returns complete recipe with all relationships
+
+        - Includes aggregated rating statistics
+
+
+        **ERD Entities:** RECIPE, INGREDIENT, RECIPE_STEP, RECIPE_MEDIA, RATING, COMMENT,
+        VIEW_HISTORY
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+      responses:
+        "200":
+          description: Recipe details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    allOf:
+                      - $ref: ../components.yaml#/components/schemas/RecipeDetail
+                      - type: object
+                        properties:
+                          ratings:
+                            type: object
+                            properties:
+                              average:
+                                type: number
+                                format: float
+                                example: 4.3
+                              count:
+                                type: integer
+                                example: 89
+                              distribution:
+                                type: object
+                                example:
+                                  "1": 1
+                                  "2": 3
+                                  "3": 12
+                                  "4": 28
+                                  "5": 45
+                          recentComments:
+                            type: array
+                            items:
+                              $ref: ../components.yaml#/components/schemas/Comment
+                            description: Most recent comments (max 5)
+                          relatedRecipes:
+                            type: array
+                            items:
+                              $ref: ../components.yaml#/components/schemas/Recipe
+                            description: Similar recipes
+                          userInteraction:
+                            type:
+                              - object
+                              - "null"
+                            properties:
+                              isFavorited:
+                                type: boolean
+                                description: Whether current user favorited this recipe
+                              userRating:
+                                type:
+                                  - integer
+                                  - "null"
+                                minimum: 1
+                                maximum: 5
+                                description: Current user's rating
+              example:
+                success: true
+                data:
+                  id: 987fcdeb-51d2-43a1-b234-567890123456
+                  name: Thịt Kho Tàu Truyền Thống
+                  views: 1251
+                  ratings:
+                    average: 4.3
+                    count: 89
+                  userInteraction:
+                    isFavorited: true
+                    userRating: 5
+        "403":
+          description: Recipe not approved or access denied
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: getRecipesByid
+  /recipes/popular:
+    get:
+      tags:
+        - Recipe Search
+      summary: Get popular recipes
+      description: |
+        Get popular recipes based on views, ratings, and recent activity.
+        Uses computed popularity score from aggregated metrics.
+
+        **ERD Entities:** RECIPE, VIEW_HISTORY, RATING
+      parameters:
+        - name: timeframe
+          in: query
+          description: Popularity timeframe
+          schema:
+            type: string
+            enum:
+              - daily
+              - weekly
+              - monthly
+              - all-time
+            default: weekly
+        - name: category
+          in: query
+          description: Filter by category
+          schema:
+            type: string
+            format: uuid
+        - $ref: ../components.yaml#/components/parameters/LimitParam
+      responses:
+        "200":
+          description: Popular recipes retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      recipes:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: ../components.yaml#/components/schemas/Recipe
+                            - type: object
+                              properties:
+                                popularityScore:
+                                  type: number
+                                  format: float
+                                  description: Computed popularity score
+                                  example: 87.5
+                                trendingRank:
+                                  type: integer
+                                  description: Rank in trending list
+                                  example: 3
+      operationId: getRecipesPopular
+  /categories:
+    get:
+      tags:
+        - Recipe Search
+      summary: Get recipe categories
+      description: |
+        Get all recipe categories with hierarchical structure and recipe counts.
+        Used for filtering and navigation.
+
+        **ERD Entities:** CATEGORY
+      parameters:
+        - name: includeEmpty
+          in: query
+          description: Include categories with no recipes
+          schema:
+            type: boolean
+            default: false
+        - name: level
+          in: query
+          description: Category hierarchy level (0=root)
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        "200":
+          description: Categories retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: ../components.yaml#/components/schemas/Category
+      operationId: getCategories
+  /ingredients/search:
+    get:
+      tags:
+        - Recipe Search
+      summary: Search ingredients for autocomplete
+      description: |
+        Search standardized ingredients for autocomplete suggestions.
+        Used in ingredient search forms.
+
+        **ERD Entities:** INGREDIENT (system ingredients)
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Ingredient search query
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          example: thịt
+        - name: limit
+          in: query
+          description: Max results to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        "200":
+          description: Ingredient suggestions found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          example: Thịt bò
+                        category:
+                          type: string
+                          example: Thịt
+                        frequency:
+                          type: integer
+                          description: Usage frequency in recipes
+                          example: 145
+              example:
+                success: true
+                data:
+                  - name: Thịt bò
+                    category: Thịt
+                    frequency: 145
+                  - name: Thịt heo
+                    category: Thịt
+                    frequency: 189
+        "400":
+          $ref: ../components.yaml#/components/responses/BadRequest
+      operationId: getIngredientsSearch
+components:
+  schemas:
+    IngredientMatchResult:
+      type: object
+      properties:
+        recipe:
+          $ref: ../components.yaml#/components/schemas/Recipe
+        matchScore:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Ingredient match percentage
+        matchedIngredients:
+          type: array
+          items:
+            type: string
+        missingIngredients:
+          type: array
+          items:
+            type: string
+        priority:
+          type: integer
+          enum:
+            - 1
+            - 2
+            - 3
+          description: Search priority level
+      required:
+        - recipe
+        - matchScore
+        - matchedIngredients
+        - priority
+    SearchFilters:
+      type: object
+      properties:
+        availableCategories:
+          type: array
+          items:
+            $ref: ../components.yaml#/components/schemas/Category
+        difficultyCount:
+          type: object
+          additionalProperties:
+            type: integer
+        ratingDistribution:
+          type: object
+          properties:
+            min:
+              type: number
+              format: float
+            max:
+              type: number
+              format: float
+            avg:
+              type: number
+              format: float
+    AIRecipeResponse:
+      allOf:
+        - $ref: ../components.yaml#/components/schemas/RecipeDetail
+        - type: object
+          properties:
+            isAIGenerated:
+              type: boolean
+            expiresAt:
+              type: string
+              format: date-time
+            aiModel:
+              type: string
+            confidence:
+              type: number
+              format: float
+              minimum: 0
+              maximum: 1
+          required:
+            - isAIGenerated
+            - expiresAt
+            - aiModel
+            - confidence
+

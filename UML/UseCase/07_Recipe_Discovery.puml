@@ -1,0 +1,85 @@
+@startuml Recipe_Discovery
+title Use Case Diagram: Recipe Discovery (UC2)
+
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam shadowing false
+skinparam backgroundColor white
+
+left to right direction
+
+actor "User" as User #4ECDC4
+actor "Guest" as Guest #95A5A6
+
+rectangle "Recipe Discovery System" {
+  usecase "UCS02-1\nSearch by Ingredients" as UC1 #FFB6C1
+  usecase "UCS02-2\nSearch by Name" as UC2 #FFE4B5
+  usecase "UCS02-3\nGenerate Recipe with AI" as UC3 #FFB6C1
+  usecase "UCS02-4\nFilter & Sort Results" as UC4 #FFE4B5
+  usecase "UCS02-5\nView Recipe Details" as UC5 #FFE4B5
+}
+
+User --> UC1
+User --> UC2
+User --> UC3
+User --> UC4
+User --> UC5
+
+Guest --> UC1
+Guest --> UC2
+Guest --> UC4
+Guest --> UC5
+
+' Relationships
+UC3 ..> UC1 : <<extend>>
+UC4 ..> UC1 : <<include>>
+UC4 ..> UC2 : <<include>>
+UC5 ..> UC1 : <<include>>
+UC5 ..> UC2 : <<include>>
+
+note right of UC1
+  **HIGH PRIORITY**
+  Smart 3-level algorithm:
+  1. All ingredients match
+  2. N-1 ingredients match
+  3. Suggest add 1-2 ingredients
+  Virtual Fridge integration
+  Cache 30 minutes
+end note
+
+note right of UC2
+  Exact/Partial/Fuzzy search
+  Remove diacritics support
+  Real-time autocomplete
+end note
+
+note right of UC3
+  **HIGH PRIORITY**
+  GPT API integration
+  Generate from ingredients
+  5 attempts/day limit
+  15 second timeout
+  Temp storage 24h
+end note
+
+note right of UC4
+  Filter by: category, time,
+  difficulty, servings, rating
+  Sort by: relevance, date, rating, name
+  Save 5 filter presets
+end note
+
+note right of UC5
+  Full recipe details
+  Ingredients & steps
+  Images & media
+  Ratings & comments
+  Increment view count
+  View history
+end note
+
+@enduml
+
+
+
+

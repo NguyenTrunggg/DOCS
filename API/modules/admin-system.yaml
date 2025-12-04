@@ -1,0 +1,233 @@
+paths:
+  /admin/accounts:
+    get:
+      tags:
+        - Admin - System
+      summary: UCA04-1 - View admin accounts list
+      description: |
+        Get list of all admin accounts with roles and permissions.
+        Super Admin only endpoint.
+
+        **ERD Entities:** ADMIN_ACCOUNT
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Admin accounts retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/AdminAccountListResponse
+      operationId: getAdminAccounts
+    post:
+      tags:
+        - Admin - System
+      summary: UCA04-2 - Create new admin account
+      description: Create new admin account with role and permissions
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../components.yaml#/components/schemas/CreateAdminRequest
+      responses:
+        "201":
+          description: Admin account created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: ../components.yaml#/components/schemas/AdminAccount
+      operationId: createAdminAccounts
+  /admin/accounts/{accountId}:
+    get:
+      tags:
+        - Admin - System
+      summary: Get admin account details
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Admin account details retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: ../components.yaml#/components/schemas/AdminAccount
+      operationId: getAdminAccountsByid
+    put:
+      tags:
+        - Admin - System
+      summary: Update admin account
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName:
+                  type: string
+                role:
+                  type: string
+                  enum:
+                    - admin
+                    - moderator
+                permissions:
+                  type: array
+                  items:
+                    type: string
+                isActive:
+                  type: boolean
+      responses:
+        "200":
+          description: Admin account updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: ../components.yaml#/components/schemas/AdminAccount
+      operationId: updateAdminAccountsByid
+    delete:
+      tags:
+        - Admin - System
+      summary: UCA04-4 - Delete admin account
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Admin account deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/SuccessResponse
+      operationId: deleteAdminAccountsByid
+  /admin/accounts/{accountId}/permissions:
+    put:
+      tags:
+        - Admin - System
+      summary: UCA04-3 - Update admin permissions
+      description: Update permissions for admin account
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                permissions:
+                  type: array
+                  items:
+                    type: string
+              required:
+                - permissions
+      responses:
+        "200":
+          description: Permissions updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: ../components.yaml#/components/schemas/AdminAccount
+      operationId: updateAdminAccountsByidPermissions
+  /admin/audit-logs:
+    get:
+      tags:
+        - Admin - System
+      summary: Get system audit logs
+      description: Get comprehensive audit trail of admin actions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: actorId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - $ref: ../components.yaml#/components/parameters/PageParam
+        - $ref: ../components.yaml#/components/parameters/LimitParam
+      responses:
+        "200":
+          description: Audit logs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      auditLogs:
+                        type: array
+                        items:
+                          $ref: ../components.yaml#/components/schemas/AuditLog
+                      pagination:
+                        $ref: ../components.yaml#/components/schemas/Pagination
+      operationId: getAdminAuditLogs
+

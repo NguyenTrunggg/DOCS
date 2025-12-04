@@ -1,0 +1,657 @@
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: UCS01-1 - Register new user account
+      description: |
+        Register a new user account with email/phone and password.
+        Creates USER entity with PENDING status and sends verification token.
+
+        **Business Rules:**
+        - Email must be unique in system
+        - Phone is optional but must be unique if provided  
+        - Password must meet security requirements (min 8 chars)
+        - Account starts in PENDING status until email verification
+
+        **ERD Entities:** USER, VERIFICATION_TOKEN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../components.yaml#/components/schemas/UserRegistrationRequest
+            examples:
+              email_registration:
+                summary: Registration with email only
+                value:
+                  email: nguyen.van.a@example.com
+                  password: SecurePass123!
+                  confirmPassword: SecurePass123!
+                  fullName: Nguyễn Văn A
+              phone_registration:
+                summary: Registration with email and phone
+                value:
+                  email: tran.thi.b@example.com
+                  password: MyPassword456!
+                  confirmPassword: MyPassword456!
+                  fullName: Trần Thị B
+                  phone: "0912345678"
+      responses:
+        "201":
+          description: Registration successful - verification email sent
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/AuthResponse
+              example:
+                success: true
+                data:
+                  user:
+                    id: 123e4567-e89b-12d3-a456-426614174000
+                    email: nguyen.van.a@example.com
+                    displayName: Nguyễn Văn A
+                    status: PENDING
+                    createdAt: 2024-01-15T10:30:00Z
+                    updatedAt: 2024-01-15T10:30:00Z
+                  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  refreshToken: refresh_token_here
+                  expiresIn: 3600
+        "400":
+          $ref: ../components.yaml#/components/responses/BadRequest
+        "409":
+          description: Email or phone already exists
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              example:
+                success: false
+                error:
+                  code: CONFLICT
+                  message: Email address already registered
+                  details:
+                    field: email
+                    value: nguyen.van.a@example.com
+      operationId: createAuthRegister
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: UCS01-2 - Login to system
+      description: |
+        Authenticate user with email/password and create session.
+        Updates USER.lastLoginAt and creates USER_SESSION record.
+
+        **Business Rules:**
+        - Account must be VERIFIED status to login
+        - LOCKED accounts cannot login
+        - Creates session with configurable expiration (24h default, 30 days if remember=true)
+        - Updates last login timestamp
+
+        **ERD Entities:** USER, USER_SESSION
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: ../components.yaml#/components/schemas/LoginRequest
+                - type: object
+                  properties:
+                    remember:
+                      type: boolean
+                      default: false
+                      description: Remember me for extended session (30 days)
+            examples:
+              standard_login:
+                summary: Standard login
+                value:
+                  email: nguyen.van.a@example.com
+                  password: SecurePass123!
+              remember_login:
+                summary: Login with remember me
+                value:
+                  email: nguyen.van.a@example.com
+                  password: SecurePass123!
+                  remember: true
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/AuthResponse
+              example:
+                success: true
+                data:
+                  user:
+                    id: 123e4567-e89b-12d3-a456-426614174000
+                    email: nguyen.van.a@example.com
+                    displayName: Nguyễn Văn A
+                    status: VERIFIED
+                    lastLoginAt: 2024-01-20T15:45:00Z
+                  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  refreshToken: refresh_token_here
+                  expiresIn: 86400
+        "400":
+          $ref: ../components.yaml#/components/responses/BadRequest
+        "401":
+          description: Invalid credentials or account not verified
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              examples:
+                invalid_credentials:
+                  summary: Wrong email/password
+                  value:
+                    success: false
+                    error:
+                      code: INVALID_CREDENTIALS
+                      message: Invalid email or password
+                pending_verification:
+                  summary: Account not verified
+                  value:
+                    success: false
+                    error:
+                      code: ACCOUNT_PENDING
+                      message: Please verify your email address before logging in
+                locked_account:
+                  summary: Account locked
+                  value:
+                    success: false
+                    error:
+                      code: ACCOUNT_LOCKED
+                      message: Account has been locked. Please contact support.
+      operationId: createAuthLogin
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: UCS01-3 - Logout from system
+      description: |
+        Logout user and invalidate current session.
+        Sets USER_SESSION.isActive = FALSE or deletes session record.
+
+        **Business Rules:**
+        - Invalidates current session token
+        - Optional: logout from all sessions with ?allSessions=true
+        - Token becomes invalid immediately
+
+        **ERD Entities:** USER_SESSION
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: allSessions
+          in: query
+          description: Logout from all sessions
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/SuccessResponse
+              example:
+                success: true
+                message: Successfully logged out
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+      operationId: createAuthLogout
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: |
+        Refresh expired access token using refresh token.
+        Extends session and returns new access token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+                  description: Valid refresh token
+              required:
+                - refreshToken
+      responses:
+        "200":
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                        description: New access token
+                      expiresIn:
+                        type: integer
+                        description: Token expiration in seconds
+        "401":
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+      operationId: createAuthRefresh
+  /auth/forgot-password:
+    post:
+      tags:
+        - Authentication
+      summary: UCS01-7 - Request password reset
+      description: |
+        Send password reset email with reset token.
+        Creates PASSWORD_RESET_TOKEN and sends email with reset link.
+
+        **Business Rules:**
+        - Email must exist and account must be VERIFIED
+        - Invalidates any existing reset tokens for user
+        - Reset token expires in 24 hours
+        - Rate limited to prevent abuse
+
+        **ERD Entities:** USER, PASSWORD_RESET_TOKEN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Registered email address
+              required:
+                - email
+            example:
+              email: nguyen.van.a@example.com
+      responses:
+        "200":
+          description: Password reset email sent (always returns 200 for security)
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/SuccessResponse
+              example:
+                success: true
+                message: If the email exists, a password reset link has been sent
+        "400":
+          $ref: ../components.yaml#/components/responses/BadRequest
+        "429":
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+      operationId: createAuthForgotPassword
+  /auth/reset-password:
+    post:
+      tags:
+        - Authentication
+      summary: UCS01-7 - Reset password with token
+      description: |
+        Reset password using valid reset token from email.
+        Validates PASSWORD_RESET_TOKEN and updates USER.passwordHash.
+
+        **Business Rules:**
+        - Token must be valid and not expired
+        - Token can only be used once (sets used=true)
+        - New password must meet security requirements
+        - Invalidates all user sessions (force re-login)
+
+        **ERD Entities:** USER, PASSWORD_RESET_TOKEN, USER_SESSION
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  description: Reset token from email
+                newPassword:
+                  type: string
+                  minLength: 8
+                  description: New password
+                confirmPassword:
+                  type: string
+                  minLength: 8
+                  description: Confirm new password
+              required:
+                - token
+                - newPassword
+                - confirmPassword
+      responses:
+        "200":
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/SuccessResponse
+        "400":
+          description: Invalid token or password mismatch
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+      operationId: createAuthResetPassword
+  /auth/verify-email:
+    post:
+      tags:
+        - Authentication
+      summary: Verify email address
+      description: |
+        Verify user email with verification token.
+        Updates USER.status from PENDING to VERIFIED.
+
+        **ERD Entities:** USER, VERIFICATION_TOKEN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  description: Email verification token
+              required:
+                - token
+      responses:
+        "200":
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/SuccessResponse
+        "400":
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+      operationId: createAuthVerifyEmail
+  /users/profile:
+    get:
+      tags:
+        - Authentication
+      summary: UCS01-4 - Get user profile
+      description: |
+        Get current user's profile information including stats.
+        Returns USER entity with embedded UserProfile data and statistics.
+
+        **Business Rules:**
+        - Returns current authenticated user's profile
+        - Includes aggregated statistics (recipes count, favorites count, etc.)
+        - Shows preferences and dietary restrictions
+
+        **ERD Entities:** USER (with embedded UserProfile data)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: ../components.yaml#/components/schemas/UserProfile
+              example:
+                success: true
+                data:
+                  id: 123e4567-e89b-12d3-a456-426614174000
+                  email: nguyen.van.a@example.com
+                  displayName: Nguyễn Văn A
+                  avatarUrl: https://example.com/avatars/user123.jpg
+                  status: VERIFIED
+                  bio: Passionate home cook who loves Vietnamese cuisine
+                  preferences:
+                    dietaryRestrictions:
+                      - vegetarian
+                    favoriteCategories:
+                      - 123e4567-e89b-12d3-a456-426614174001
+                  stats:
+                    recipesCount: 25
+                    favoritesCount: 150
+                    ratingsGivenCount: 78
+                    commentsCount: 42
+                  createdAt: 2024-01-15T10:30:00Z
+                  updatedAt: 2024-01-20T15:45:00Z
+                  lastLoginAt: 2024-01-25T08:15:00Z
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+      operationId: getUsersProfile
+    put:
+      tags:
+        - Authentication
+      summary: UCS01-5 - Update user profile
+      description: |
+        Update current user's profile information.
+        Updates USER entity fields like displayName, avatarUrl, bio, preferences.
+
+        **Business Rules:**
+        - Can update display name, avatar, bio, preferences
+        - Email change requires separate verification process
+        - Updates updatedAt timestamp automatically
+
+        **ERD Entities:** USER
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../components.yaml#/components/schemas/UpdateProfileRequest
+            example:
+              fullName: Nguyễn Văn An
+              bio: Experienced home chef specializing in traditional Vietnamese dishes
+              preferences:
+                dietaryRestrictions:
+                  - vegetarian
+                  - gluten-free
+                favoriteCategories:
+                  - 123e4567-e89b-12d3-a456-426614174001
+                  - 123e4567-e89b-12d3-a456-426614174002
+      responses:
+        "200":
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: ../components.yaml#/components/schemas/UserProfile
+        "400":
+          $ref: ../components.yaml#/components/responses/BadRequest
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+      operationId: updateUsersProfile
+  /users/change-password:
+    put:
+      tags:
+        - Authentication
+      summary: UCS01-6 - Change user password
+      description: |
+        Change user password with current password verification.
+        Updates USER.passwordHash and revokes all sessions for security.
+
+        **Business Rules:**
+        - Must provide current password for verification
+        - New password must meet security requirements
+        - Revokes all sessions (forces re-login everywhere)
+        - Updates updatedAt timestamp
+
+        **ERD Entities:** USER, USER_SESSION
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../components.yaml#/components/schemas/ChangePasswordRequest
+            example:
+              currentPassword: OldPassword123!
+              newPassword: NewSecurePassword456!
+              confirmNewPassword: NewSecurePassword456!
+      responses:
+        "200":
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/SuccessResponse
+              example:
+                success: true
+                message: Password changed successfully. Please login again.
+        "400":
+          description: Current password incorrect or validation failed
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              examples:
+                wrong_current_password:
+                  summary: Current password incorrect
+                  value:
+                    success: false
+                    error:
+                      code: INVALID_PASSWORD
+                      message: Current password is incorrect
+                password_mismatch:
+                  summary: New passwords don't match
+                  value:
+                    success: false
+                    error:
+                      code: PASSWORD_MISMATCH
+                      message: New password confirmation doesn't match
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+      operationId: updateUsersChangePassword
+  /users/sessions:
+    get:
+      tags:
+        - Authentication
+      summary: Get active user sessions
+      description: |
+        Get list of active sessions for current user.
+        Shows all USER_SESSION records for security management.
+
+        **ERD Entities:** USER_SESSION
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Active sessions retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        ipAddress:
+                          type: string
+                        userAgent:
+                          type: string
+                        createdAt:
+                          type: string
+                          format: date-time
+                        lastAccessedAt:
+                          type: string
+                          format: date-time
+                        isCurrent:
+                          type: boolean
+                          description: Whether this is the current session
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+      operationId: getUsersSessions
+    delete:
+      tags:
+        - Authentication
+      summary: Revoke user sessions
+      description: |
+        Revoke specific or all user sessions.
+        Sets USER_SESSION.isActive = FALSE for specified sessions.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sessionId
+          in: query
+          description: Specific session ID to revoke (omit for all sessions)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Sessions revoked successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/SuccessResponse
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+      operationId: deleteUsersSessions
+components:
+  schemas:
+    SessionInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ipAddress:
+          type: string
+          example: 192.168.1.100
+        userAgent:
+          type: string
+          example: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+        createdAt:
+          type: string
+          format: date-time
+        lastAccessedAt:
+          type: string
+          format: date-time
+        isCurrent:
+          type: boolean
+          description: Whether this is the current session
+      required:
+        - id
+        - createdAt
+        - isCurrent
+

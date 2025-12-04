@@ -1,0 +1,888 @@
+paths:
+  /recipes/{recipeId}/favorite:
+    post:
+      tags:
+        - Social Features
+      summary: UCS04-1 - Add recipe to favorites
+      description: |
+        Add recipe to user's favorites list.
+        Creates FAVORITE entity with unique constraint (userId, recipeId).
+
+        **Business Rules:**
+        - User must be authenticated
+        - Recipe must be APPROVED status
+        - Unique constraint: one favorite per user per recipe
+        - User can have maximum 500 favorites (business rule)
+        - Updates Recipe.favoriteCount counter
+
+        **ERD Entities:** FAVORITE, RECIPE (favoriteCount update)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+      responses:
+        "201":
+          description: Recipe added to favorites successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: ../components.yaml#/components/schemas/Favorite
+              example:
+                success: true
+                data:
+                  id: fav-123e4567-e89b-12d3-a456-426614174000
+                  userId: 123e4567-e89b-12d3-a456-426614174000
+                  recipeId: 987fcdeb-51d2-43a1-b234-567890123456
+                  addedAt: 2024-01-15T10:30:00Z
+        "400":
+          description: Business rule violation
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              examples:
+                favorites_limit:
+                  summary: Favorites limit reached
+                  value:
+                    success: false
+                    error:
+                      code: FAVORITES_LIMIT_EXCEEDED
+                      message: You can have maximum 500 favorite recipes
+                      details:
+                        currentCount: 500
+                        limit: 500
+                recipe_not_approved:
+                  summary: Recipe not approved
+                  value:
+                    success: false
+                    error:
+                      code: RECIPE_NOT_APPROVED
+                      message: Only approved recipes can be favorited
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+        "409":
+          description: Recipe already favorited
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              example:
+                success: false
+                error:
+                  code: ALREADY_FAVORITED
+                  message: This recipe is already in your favorites
+      operationId: createRecipesByidFavorite
+    delete:
+      tags:
+        - Social Features
+      summary: UCS04-2 - Remove recipe from favorites
+      description: |
+        Remove recipe from user's favorites list.
+        Deletes FAVORITE entity and updates Recipe.favoriteCount.
+
+        **Business Rules:**
+        - User can only remove their own favorites
+        - Updates Recipe.favoriteCount counter atomically
+
+        **ERD Entities:** FAVORITE, RECIPE (favoriteCount update)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+      responses:
+        "200":
+          description: Recipe removed from favorites successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/SuccessResponse
+              example:
+                success: true
+                message: Recipe removed from favorites
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "404":
+          description: Recipe not in favorites
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              example:
+                success: false
+                error:
+                  code: NOT_FAVORITED
+                  message: This recipe is not in your favorites
+      operationId: deleteRecipesByidFavorite
+  /users/favorites:
+    get:
+      tags:
+        - Social Features
+      summary: UCS04-3 - Get user's favorite recipes
+      description: |
+        Get paginated list of user's favorite recipes with sorting options.
+        Joins FAVORITE with RECIPE to return full recipe information.
+
+        **Business Rules:**
+        - Shows favorites ordered by addedAt (newest first) by default
+        - Only shows APPROVED recipes that are not deleted
+        - Supports filtering by category, difficulty
+
+        **ERD Entities:** FAVORITE, RECIPE, CATEGORY
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: category
+          in: query
+          description: Filter by recipe category
+          schema:
+            type: string
+            format: uuid
+        - $ref: ../components.yaml#/components/parameters/DifficultyParam
+        - name: sortBy
+          in: query
+          description: Sort favorites by
+          schema:
+            type: string
+            enum:
+              - addedAt
+              - recipeName
+              - recipeRating
+              - recipeViews
+            default: addedAt
+        - name: order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+        - $ref: ../components.yaml#/components/parameters/PageParam
+        - $ref: ../components.yaml#/components/parameters/LimitParam
+      responses:
+        "200":
+          description: Favorite recipes retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      favorites:
+                        type: array
+                        items:
+                          type: object
+                          allOf:
+                            - $ref: ../components.yaml#/components/schemas/Favorite
+                            - type: object
+                              properties:
+                                recipe:
+                                  $ref: ../components.yaml#/components/schemas/Recipe
+                      pagination:
+                        $ref: ../components.yaml#/components/schemas/Pagination
+                      statistics:
+                        type: object
+                        properties:
+                          totalFavorites:
+                            type: integer
+                            example: 150
+                          categoryCounts:
+                            type: object
+                            example:
+                              Món chính: 45
+                              Món tráng miệng: 32
+                          avgRating:
+                            type: number
+                            format: float
+                            example: 4.3
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+      operationId: getUsersFavorites
+  /recipes/{recipeId}/rating:
+    post:
+      tags:
+        - Social Features
+      summary: UCS04-4 - Rate recipe
+      description: |
+        Give rating (1-5 stars) to a recipe with optional comment.
+        Uses upsert pattern - creates new or updates existing rating.
+
+        **Business Rules:**
+        - User must be authenticated
+        - Recipe must be APPROVED status
+        - Score must be 1-5 integers
+        - Unique constraint: one rating per user per recipe (can update)
+        - Updates Recipe.avgRating and ratingCount automatically
+
+        **ERD Entities:** RATING, RECIPE (rating aggregates update)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../components.yaml#/components/schemas/RatingRequest
+            example:
+              score: 5
+              comment: Công thức rất hay! Gia đình tôi rất thích món này. Sẽ làm lại nhiều lần.
+      responses:
+        "200":
+          description: Rating updated successfully (existing rating)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    allOf:
+                      - $ref: ../components.yaml#/components/schemas/Rating
+                      - type: object
+                        properties:
+                          isUpdate:
+                            type: boolean
+                            example: true
+                          previousScore:
+                            type: integer
+                            example: 4
+        "201":
+          description: Rating submitted successfully (new rating)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    allOf:
+                      - $ref: ../components.yaml#/components/schemas/Rating
+                      - type: object
+                        properties:
+                          isUpdate:
+                            type: boolean
+                            example: false
+                          recipeStats:
+                            type: object
+                            properties:
+                              newAvgRating:
+                                type: number
+                                format: float
+                                example: 4.3
+                              newRatingCount:
+                                type: integer
+                                example: 89
+        "400":
+          description: Invalid rating data
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              examples:
+                invalid_score:
+                  summary: Invalid score value
+                  value:
+                    success: false
+                    error:
+                      code: INVALID_SCORE
+                      message: Rating score must be between 1 and 5
+                      details:
+                        field: score
+                        value: 6
+                        constraint: 1-5
+                cannot_rate_own:
+                  summary: Cannot rate own recipe
+                  value:
+                    success: false
+                    error:
+                      code: CANNOT_RATE_OWN_RECIPE
+                      message: You cannot rate your own recipe
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: createRecipesByidRating
+    get:
+      tags:
+        - Social Features
+      summary: Get user's rating for recipe
+      description: |
+        Get current user's rating for specific recipe.
+        Returns null if user hasn't rated the recipe.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+      responses:
+        "200":
+          description: User rating retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    allOf:
+                      - $ref: ../components.yaml#/components/schemas/Rating
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: getRecipesByidRating
+  /recipes/{recipeId}/comments:
+    get:
+      tags:
+        - Social Features
+      summary: UCS04-5 - Get recipe comments
+      description: |
+        Get paginated comments for a recipe with sorting options.
+        Includes user information and helpful counts.
+
+        **Business Rules:**
+        - Shows non-deleted comments only (is_deleted = FALSE)
+        - Default sort by helpful count (most helpful first)
+        - Includes user display name and avatar
+
+        **ERD Entities:** COMMENT, USER
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+        - name: sortBy
+          in: query
+          description: Sort comments by
+          schema:
+            type: string
+            enum:
+              - createdAt
+              - helpfulCount
+              - rating
+            default: helpfulCount
+        - name: order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+        - $ref: ../components.yaml#/components/parameters/PageParam
+        - $ref: ../components.yaml#/components/parameters/LimitParam
+      responses:
+        "200":
+          description: Comments retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      comments:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: ../components.yaml#/components/schemas/Comment
+                            - type: object
+                              properties:
+                                user:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                    displayName:
+                                      type: string
+                                    avatarUrl:
+                                      type:
+                                        - string
+                                        - "null"
+                                      format: uri
+                                userRating:
+                                  type:
+                                    - integer
+                                    - "null"
+                                  minimum: 1
+                                  maximum: 5
+                                  description: User's rating for this recipe
+                                canEdit:
+                                  type: boolean
+                                  description: Whether current user can edit this comment
+                      pagination:
+                        $ref: ../components.yaml#/components/schemas/Pagination
+                      summary:
+                        type: object
+                        properties:
+                          totalComments:
+                            type: integer
+                            example: 142
+                          avgHelpfulScore:
+                            type: number
+                            format: float
+                            example: 3.2
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: getRecipesByidComments
+    post:
+      tags:
+        - Social Features
+      summary: UCS04-4 - Add comment to recipe
+      description: |
+        Add a new comment to recipe with optional photos and tags.
+        User can comment multiple times on same recipe.
+
+        **Business Rules:**
+        - User must be authenticated
+        - Recipe must be APPROVED status
+        - Comment content required (1-1000 chars)
+        - Photos optional (max 5 images)
+        - Tags optional for quick feedback
+
+        **ERD Entities:** COMMENT
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../components.yaml#/components/schemas/CommentRequest
+            example:
+              content: Tôi đã thử làm theo công thức này và rất thành công! Gia đình ai cũng khen ngon.
+              photos:
+                - https://example.com/my-result1.jpg
+                - https://example.com/my-result2.jpg
+              tags:
+                - delicious
+                - easy-to-follow
+                - family-approved
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+                photos:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  maxItems: 5
+                tags:
+                  type: array
+                  items:
+                    type: string
+              required:
+                - content
+      responses:
+        "201":
+          description: Comment added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: ../components.yaml#/components/schemas/Comment
+        "400":
+          $ref: ../components.yaml#/components/responses/BadRequest
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+        "413":
+          description: Photos too large
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+      operationId: createRecipesByidComments
+  /comments/{commentId}/helpful:
+    post:
+      tags:
+        - Social Features
+      summary: Mark comment as helpful
+      description: |
+        Mark a comment as helpful. Increments helpfulCount.
+        Users can only mark each comment helpful once.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          description: Comment UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Comment marked as helpful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      newHelpfulCount:
+                        type: integer
+                        example: 13
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+        "409":
+          description: Already marked as helpful
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+      operationId: createCommentsByidHelpful
+  /recipes/{recipeId}/share:
+    post:
+      tags:
+        - Social Features
+      summary: UCS04-6 - Share recipe
+      description: |
+        Share recipe through various channels and track sharing activity.
+        Creates SHARE_RECORD for analytics and supports anonymous sharing.
+
+        **Business Rules:**
+        - Recipe must be APPROVED status
+        - Supports both authenticated and anonymous sharing
+        - Records sharing statistics for analytics
+        - Different channels may have different requirements
+
+        **ERD Entities:** SHARE_RECORD, RECIPE
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                channel:
+                  type: string
+                  enum:
+                    - FACEBOOK
+                    - INSTAGRAM
+                    - TWITTER
+                    - WHATSAPP
+                    - EMAIL
+                    - COPY_LINK
+                    - QR_CODE
+                  description: Sharing channel
+                recipients:
+                  type: array
+                  items:
+                    type: string
+                  description: Email addresses (for EMAIL channel)
+                  maxItems: 10
+                message:
+                  type: string
+                  maxLength: 500
+                  description: Custom message (optional)
+              required:
+                - channel
+            example:
+              channel: FACEBOOK
+              message: Thử món này nhé, rất ngon!
+      responses:
+        "200":
+          description: Recipe shared successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      shareRecord:
+                        $ref: ../components.yaml#/components/schemas/ShareRecord
+                      shareUrl:
+                        type: string
+                        format: uri
+                        description: Generated share URL
+                        example: https://recipeapp.com/recipes/987fcdeb?share=fb123
+                      qrCode:
+                        type:
+                          - string
+                          - "null"
+                        description: Base64 QR code (for QR_CODE channel)
+              example:
+                success: true
+                data:
+                  shareRecord:
+                    id: share-123e4567-e89b-12d3-a456-426614174000
+                    recipeId: 987fcdeb-51d2-43a1-b234-567890123456
+                    channel: FACEBOOK
+                    sharedAt: 2024-01-15T10:30:00Z
+                  shareUrl: https://recipeapp.com/recipes/987fcdeb?share=fb123
+        "400":
+          description: Invalid share request
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              examples:
+                invalid_email_channel:
+                  summary: Email channel requires recipients
+                  value:
+                    success: false
+                    error:
+                      code: MISSING_RECIPIENTS
+                      message: Email sharing requires at least one recipient
+                too_many_recipients:
+                  summary: Too many email recipients
+                  value:
+                    success: false
+                    error:
+                      code: TOO_MANY_RECIPIENTS
+                      message: Maximum 10 email recipients allowed
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+        "429":
+          description: Share rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+      operationId: createRecipesByidShare
+  /share/channels:
+    get:
+      tags:
+        - Social Features
+      summary: Get available share channels
+      description: |
+        Get list of available sharing channels with their configuration.
+        Used to populate sharing UI options.
+
+        **ERD Entities:** SHARE_CHANNEL
+      responses:
+        "200":
+          description: Share channels retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          example: FACEBOOK
+                        displayName:
+                          type: string
+                          example: Facebook
+                        iconUrl:
+                          type: string
+                          format: uri
+                          example: https://cdn.example.com/icons/facebook.svg
+                        isActive:
+                          type: boolean
+                          example: true
+                        description:
+                          type: string
+                          example: Share to your Facebook timeline
+                        requiresAuth:
+                          type: boolean
+                          example: false
+                          description: Whether this channel requires user authentication
+      operationId: getShareChannels
+components:
+  schemas:
+    FavoriteWithRecipe:
+      allOf:
+        - $ref: ../components.yaml#/components/schemas/Favorite
+        - type: object
+          properties:
+            recipe:
+              $ref: ../components.yaml#/components/schemas/Recipe
+    CommentWithUser:
+      allOf:
+        - $ref: ../components.yaml#/components/schemas/Comment
+        - type: object
+          properties:
+            user:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                displayName:
+                  type: string
+                avatarUrl:
+                  type:
+                    - string
+                    - "null"
+                  format: uri
+            userRating:
+              type:
+                - integer
+                - "null"
+              minimum: 1
+              maximum: 5
+              description: User's rating for the recipe
+            canEdit:
+              type: boolean
+              description: Whether current user can edit this comment
+            canDelete:
+              type: boolean
+              description: Whether current user can delete this comment
+    ShareChannelInfo:
+      type: object
+      properties:
+        name:
+          type: string
+          enum:
+            - FACEBOOK
+            - INSTAGRAM
+            - TWITTER
+            - WHATSAPP
+            - EMAIL
+            - COPY_LINK
+            - QR_CODE
+        displayName:
+          type: string
+        iconUrl:
+          type:
+            - string
+            - "null"
+          format: uri
+        isActive:
+          type: boolean
+        description:
+          type: string
+        requiresAuth:
+          type: boolean
+          description: Whether sharing through this channel requires authentication
+        config:
+          type:
+            - object
+            - "null"
+          description: Channel-specific configuration
+      required:
+        - name
+        - displayName
+        - isActive
+        - requiresAuth
+    ShareResult:
+      type: object
+      properties:
+        shareRecord:
+          $ref: ../components.yaml#/components/schemas/ShareRecord
+        shareUrl:
+          type: string
+          format: uri
+          description: Generated shareable URL
+        qrCode:
+          type:
+            - string
+            - "null"
+          description: Base64 encoded QR code image
+        externalUrl:
+          type:
+            - string
+            - "null"
+          format: uri
+          description: External platform URL (e.g., Facebook post URL)
+        emailsSent:
+          type:
+            - integer
+            - "null"
+          description: Number of emails sent (for EMAIL channel)
+      required:
+        - shareRecord
+        - shareUrl
+    SocialStats:
+      type: object
+      properties:
+        totalFavorites:
+          type: integer
+        totalRatings:
+          type: integer
+        totalComments:
+          type: integer
+        totalShares:
+          type: integer
+        avgRating:
+          type:
+            - number
+            - "null"
+          format: float
+        ratingDistribution:
+          type: object
+          properties:
+            "1":
+              type: integer
+            "2":
+              type: integer
+            "3":
+              type: integer
+            "4":
+              type: integer
+            "5":
+              type: integer
+        topShareChannels:
+          type: array
+          items:
+            type: object
+            properties:
+              channel:
+                type: string
+              count:
+                type: integer
+              percentage:
+                type: number
+                format: float
+

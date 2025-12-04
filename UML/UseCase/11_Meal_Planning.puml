@@ -1,0 +1,85 @@
+@startuml Meal_Planning
+title Use Case Diagram: Meal Planning (UC6)
+
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam shadowing false
+skinparam backgroundColor white
+
+left to right direction
+
+actor "User" as User #4ECDC4
+
+rectangle "Meal Planning System" {
+  package "Meal Plan Management" {
+    usecase "UCS06-1\nCreate Meal Plan" as UC1 #FFE4B5
+    usecase "UCS06-2\nView Meal Plan" as UC2 #E0F0FF
+    usecase "UCS06-3\nUpdate Meal Plan" as UC3 #FFE4B5
+    usecase "UCS06-4\nDelete Meal Plan" as UC4 #E0F0FF
+  }
+  
+  package "Shopping List" {
+    usecase "UCS06-5\nGenerate Shopping List" as UC5 #FFE4B5
+  }
+}
+
+User --> UC1
+User --> UC2
+User --> UC3
+User --> UC4
+User --> UC5
+
+' Relationships
+UC3 ..> UC2 : <<include>>
+UC4 ..> UC2 : <<include>>
+UC5 ..> UC2 : <<include>>
+
+note right of UC1
+  Create for day/week/month
+  Add dishes to meals:
+  Breakfast, Lunch, Dinner, Snacks
+  Select from search
+  Customize portions
+  Menu templates
+  Create from favorites
+  AI meal suggestions by goal
+end note
+
+note right of UC2
+  View in calendar format
+  Day/Week/Month views
+  Drag & drop to move dishes
+  Quick actions: switch meal, delete, copy
+  Filter by meal/category/difficulty
+end note
+
+note right of UC3
+  Drag & drop between meals/days
+  Replace, add, remove dishes
+  Adjust portions
+  Batch edit
+  Undo/Redo
+  Auto-save drafts
+end note
+
+note right of UC5
+  **MEDIUM PRIORITY**
+  Aggregate ingredients from all recipes
+  Merge duplicates
+  Convert to standard units
+  Multiply by portions
+  Subtract Virtual Fridge items
+  Group by category
+  Smart shopping list
+end note
+
+note bottom of UC5
+  Integration with UC5 (Virtual Fridge)
+  Cross-module data flow
+end note
+
+@enduml
+
+
+
+

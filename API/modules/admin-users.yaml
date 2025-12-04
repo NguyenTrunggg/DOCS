@@ -1,0 +1,1102 @@
+paths:
+  /admin/users:
+    get:
+      tags:
+        - Admin - Users
+      summary: UCA01-1 - View users list
+      description: |
+        Get paginated list of all users with filtering, search, and sorting capabilities.
+        Admin-only endpoint for user oversight and management.
+
+        **Business Rules:**
+        - Requires admin authentication and user management permissions
+        - Supports advanced filtering by status, role, registration date
+        - Full-text search on email, name fields
+        - Includes user statistics and activity summaries
+        - Returns audit trail for sensitive operations
+
+        **ERD Entities:** USER, USER_ACTIVITY (for stats)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/StatusParam
+        - name: role
+          in: query
+          description: Filter by user role
+          schema:
+            type: string
+            enum:
+              - user
+              - admin
+              - moderator
+        - name: search
+          in: query
+          description: Search in email and display name
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 100
+          example: nguyen
+        - name: registrationDateFrom
+          in: query
+          description: Filter users registered after date
+          schema:
+            type: string
+            format: date
+        - name: registrationDateTo
+          in: query
+          description: Filter users registered before date
+          schema:
+            type: string
+            format: date
+        - name: lastLoginFrom
+          in: query
+          description: Filter by last login date (activity analysis)
+          schema:
+            type: string
+            format: date
+        - name: sortBy
+          in: query
+          description: Sort users by field
+          schema:
+            type: string
+            enum:
+              - createdAt
+              - lastLoginAt
+              - email
+              - displayName
+              - status
+            default: createdAt
+        - name: order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+        - $ref: ../components.yaml#/components/parameters/PageParam
+        - $ref: ../components.yaml#/components/parameters/LimitParam
+      responses:
+        "200":
+          description: Users list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      users:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: ../components.yaml#/components/schemas/User
+                            - type: object
+                              properties:
+                                stats:
+                                  type: object
+                                  properties:
+                                    recipesCount:
+                                      type: integer
+                                    favoritesCount:
+                                      type: integer
+                                    ratingsCount:
+                                      type: integer
+                                    commentsCount:
+                                      type: integer
+                                    totalLogins:
+                                      type: integer
+                                    accountAge:
+                                      type: integer
+                                      description: Account age in days
+                                recentActivity:
+                                  type: object
+                                  properties:
+                                    lastRecipeCreated:
+                                      type:
+                                        - string
+                                        - "null"
+                                      format: date-time
+                                    lastComment:
+                                      type:
+                                        - string
+                                        - "null"
+                                      format: date-time
+                                    activityScore:
+                                      type: number
+                                      format: float
+                                      description: Activity score (0-1)
+                                riskFlags:
+                                  type: array
+                                  items:
+                                    type: string
+                                  description: Potential risk indicators
+                                  example:
+                                    - multiple_failed_logins
+                                    - spam_reports
+                      pagination:
+                        $ref: ../components.yaml#/components/schemas/Pagination
+                      summary:
+                        type: object
+                        properties:
+                          totalUsers:
+                            type: integer
+                            example: 15420
+                          statusBreakdown:
+                            type: object
+                            properties:
+                              VERIFIED:
+                                type: integer
+                                example: 14580
+                              PENDING:
+                                type: integer
+                                example: 650
+                              LOCKED:
+                                type: integer
+                                example: 190
+                          newUsersThisMonth:
+                            type: integer
+                            example: 1250
+                          activeUsersLastWeek:
+                            type: integer
+                            example: 8960
+              example:
+                success: true
+                data:
+                  users:
+                    - id: 123e4567-e89b-12d3-a456-426614174000
+                      email: nguyen.van.a@example.com
+                      displayName: Nguyễn Văn A
+                      status: VERIFIED
+                      createdAt: 2024-01-15T10:30:00Z
+                      lastLoginAt: 2024-01-24T08:15:00Z
+                      stats:
+                        recipesCount: 25
+                        favoritesCount: 150
+                        accountAge: 180
+                      riskFlags: []
+                  pagination:
+                    page: 1
+                    limit: 20
+                    total: 15420
+                    totalPages: 771
+                    hasNext: true
+                    hasPrevious: false
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          description: Insufficient admin permissions
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              example:
+                success: false
+                error:
+                  code: INSUFFICIENT_PERMISSIONS
+                  message: Admin permissions required for user management
+      operationId: getAdminUsers
+  /admin/users/{userId}:
+    get:
+      tags:
+        - Admin - Users
+      summary: UCA01-2 - View user details
+      description: |
+        Get comprehensive user details including profile, activity history, and statistics.
+        Provides complete user overview for admin decision making.
+
+        **Business Rules:**
+        - Requires admin authentication with user read permissions
+        - Returns complete user profile with sensitive information
+        - Includes detailed activity history and login patterns
+        - Shows user-generated content statistics
+        - Provides audit trail and violation history
+
+        **ERD Entities:** USER, USER_ACTIVITY, AUDIT_LOG, USER_SESSION
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/UserIdParam
+        - name: includeActivity
+          in: query
+          description: Include recent activity history
+          schema:
+            type: boolean
+            default: true
+        - name: includeAuditLogs
+          in: query
+          description: Include admin audit logs for this user
+          schema:
+            type: boolean
+            default: true
+        - name: activityLimit
+          in: query
+          description: Limit number of recent activities
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: User details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    allOf:
+                      - $ref: ../components.yaml#/components/schemas/UserProfile
+                      - type: object
+                        properties:
+                          adminInfo:
+                            type: object
+                            properties:
+                              registrationIP:
+                                type: string
+                                description: IP address used during registration
+                                example: 192.168.1.100
+                              emailVerified:
+                                type: boolean
+                                example: true
+                              phoneVerified:
+                                type: boolean
+                                example: false
+                              twoFactorEnabled:
+                                type: boolean
+                                example: false
+                              lockInfo:
+                                type: object
+                                properties:
+                                  isLocked:
+                                    type: boolean
+                                  reason:
+                                    type:
+                                      - string
+                                      - "null"
+                                  lockUntil:
+                                    type:
+                                      - string
+                                      - "null"
+                                    format: date-time
+                                  lockedBy:
+                                    type:
+                                      - string
+                                      - "null"
+                                    format: uuid
+                                    description: Admin who locked the account
+                                  lockedAt:
+                                    type:
+                                      - string
+                                      - "null"
+                                    format: date-time
+                          detailedStats:
+                            type: object
+                            properties:
+                              content:
+                                type: object
+                                properties:
+                                  totalRecipes:
+                                    type: integer
+                                  approvedRecipes:
+                                    type: integer
+                                  pendingRecipes:
+                                    type: integer
+                                  rejectedRecipes:
+                                    type: integer
+                                  totalComments:
+                                    type: integer
+                                  totalRatings:
+                                    type: integer
+                                  avgRatingGiven:
+                                    type: number
+                                    format: float
+                              engagement:
+                                type: object
+                                properties:
+                                  totalLogins:
+                                    type: integer
+                                  avgSessionDuration:
+                                    type: number
+                                    format: float
+                                    description: Average session duration in minutes
+                                  lastActiveDate:
+                                    type: string
+                                    format: date-time
+                                  longestStreak:
+                                    type: integer
+                                    description: Longest consecutive login days
+                                  currentStreak:
+                                    type: integer
+                              social:
+                                type: object
+                                properties:
+                                  totalFavorites:
+                                    type: integer
+                                  recipesShared:
+                                    type: integer
+                                  helpfulVotesReceived:
+                                    type: integer
+                                  helpfulVotesGiven:
+                                    type: integer
+                          recentActivity:
+                            type: array
+                            items:
+                              $ref: ../components.yaml#/components/schemas/UserActivity
+                            description: Recent user activities (if includeActivity=true)
+                          loginHistory:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                timestamp:
+                                  type: string
+                                  format: date-time
+                                ipAddress:
+                                  type: string
+                                userAgent:
+                                  type: string
+                                sessionDuration:
+                                  type: integer
+                                  description: Session duration in minutes
+                                location:
+                                  type:
+                                    - string
+                                    - "null"
+                                  description: Approximate location based on IP
+                            maxItems: 20
+                            description: Recent login history
+                          auditLogs:
+                            type: array
+                            items:
+                              $ref: ../components.yaml#/components/schemas/AuditLog
+                            description: Admin actions related to this user (if includeAuditLogs=true)
+                          riskAssessment:
+                            type: object
+                            properties:
+                              riskScore:
+                                type: number
+                                format: float
+                                minimum: 0
+                                maximum: 1
+                                description: Computed risk score
+                              flags:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    type:
+                                      type: string
+                                      enum:
+                                        - SUSPICIOUS_LOGIN
+                                        - CONTENT_VIOLATION
+                                        - SPAM_BEHAVIOR
+                                        - MULTIPLE_REPORTS
+                                    severity:
+                                      type: string
+                                      enum:
+                                        - LOW
+                                        - MEDIUM
+                                        - HIGH
+                                        - CRITICAL
+                                    description:
+                                      type: string
+                                    detectedAt:
+                                      type: string
+                                      format: date-time
+                              recommendations:
+                                type: array
+                                items:
+                                  type: string
+                                description: Recommended admin actions
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: getAdminUsersByid
+  /admin/users/{userId}/deactivate:
+    put:
+      tags:
+        - Admin - Users
+      summary: UCA01-3 - Deactivate user account
+      description: |
+        Deactivate/lock user account with reason and duration.
+        Sets user status to LOCKED and revokes active sessions.
+
+        **Business Rules:**
+        - Requires admin authentication with user management permissions
+        - Must provide reason for account lock (audit requirement)
+        - Optional duration - null means permanent lock
+        - Automatically revokes all active user sessions
+        - Creates audit log entry for compliance
+        - Sends notification to user (if not system suspension)
+
+        **ERD Entities:** USER, USER_SESSION, AUDIT_LOG
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/UserIdParam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../components.yaml#/components/schemas/DeactivateUserRequest
+            example:
+              reason: Multiple violations of community guidelines - inappropriate content and spam behavior
+              duration: 30
+              notifyUser: true
+              revokeTokens: true
+      responses:
+        "200":
+          description: User account deactivated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          email:
+                            type: string
+                          displayName:
+                            type: string
+                          status:
+                            type: string
+                            example: LOCKED
+                          lockInfo:
+                            type: object
+                            properties:
+                              reason:
+                                type: string
+                              lockUntil:
+                                type:
+                                  - string
+                                  - "null"
+                                format: date-time
+                              lockedBy:
+                                type: string
+                                format: uuid
+                              lockedAt:
+                                type: string
+                                format: date-time
+                      auditLog:
+                        $ref: ../components.yaml#/components/schemas/AuditLog
+                      sessionsRevoked:
+                        type: integer
+                        description: Number of active sessions revoked
+                        example: 3
+                      notificationSent:
+                        type: boolean
+                        description: Whether user notification was sent
+                        example: true
+        "400":
+          description: Invalid deactivation request
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              examples:
+                already_locked:
+                  summary: User already locked
+                  value:
+                    success: false
+                    error:
+                      code: USER_ALREADY_LOCKED
+                      message: User account is already locked
+                      details:
+                        currentStatus: LOCKED
+                        lockUntil: 2024-02-15T10:30:00Z
+                invalid_duration:
+                  summary: Invalid lock duration
+                  value:
+                    success: false
+                    error:
+                      code: INVALID_DURATION
+                      message: Lock duration must be between 1 and 365 days
+                      details:
+                        provided: 400
+                        max: 365
+                reason_too_short:
+                  summary: Reason too short
+                  value:
+                    success: false
+                    error:
+                      code: REASON_TOO_SHORT
+                      message: Reason must be at least 10 characters
+                      details:
+                        minLength: 10
+                        provided: 8
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: updateAdminUsersByidDeactivate
+  /admin/users/{userId}/activate:
+    put:
+      tags:
+        - Admin - Users
+      summary: UCA01-4 - Activate user account
+      description: |
+        Reactivate previously locked user account.
+        Removes lock status and allows user to login again.
+
+        **Business Rules:**
+        - Requires admin authentication with user management permissions
+        - Can only activate LOCKED accounts
+        - Must provide reason for reactivation (audit requirement)
+        - Creates audit log entry for compliance
+        - Optionally sends welcome back notification
+
+        **ERD Entities:** USER, AUDIT_LOG
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/UserIdParam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  minLength: 10
+                  maxLength: 500
+                  description: Reason for account reactivation
+                notifyUser:
+                  type: boolean
+                  default: true
+                  description: Send reactivation notification to user
+                resetPasswordRequired:
+                  type: boolean
+                  default: false
+                  description: Require password reset on next login
+              required:
+                - reason
+            example:
+              reason: User appeal accepted - violation was accidental, user has been educated on community
+                guidelines
+              notifyUser: true
+              resetPasswordRequired: false
+      responses:
+        "200":
+          description: User account activated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          email:
+                            type: string
+                          displayName:
+                            type: string
+                          status:
+                            type: string
+                            example: VERIFIED
+                          activatedAt:
+                            type: string
+                            format: date-time
+                          previousLockInfo:
+                            type: object
+                            properties:
+                              reason:
+                                type: string
+                              duration:
+                                type:
+                                  - integer
+                                  - "null"
+                              lockedBy:
+                                type: string
+                                format: uuid
+                              lockedAt:
+                                type: string
+                                format: date-time
+                      auditLog:
+                        $ref: ../components.yaml#/components/schemas/AuditLog
+                      notificationSent:
+                        type: boolean
+                        example: true
+        "400":
+          description: Invalid activation request
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              examples:
+                not_locked:
+                  summary: User not locked
+                  value:
+                    success: false
+                    error:
+                      code: USER_NOT_LOCKED
+                      message: User account is not locked
+                      details:
+                        currentStatus: VERIFIED
+                auto_unlock_pending:
+                  summary: Auto unlock scheduled
+                  value:
+                    success: false
+                    error:
+                      code: AUTO_UNLOCK_PENDING
+                      message: Account has scheduled automatic unlock
+                      details:
+                        unlockDate: 2024-02-15T10:30:00Z
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: updateAdminUsersByidActivate
+  /admin/users/{userId}/activities:
+    get:
+      tags:
+        - Admin - Users
+      summary: Get user activity history
+      description: |
+        Get detailed activity history for specific user.
+        Provides timeline of user actions for analysis and support.
+
+        **ERD Entities:** USER_ACTIVITY, AUDIT_LOG
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/UserIdParam
+        - name: activityType
+          in: query
+          description: Filter by activity type
+          schema:
+            type: string
+            enum:
+              - RECIPE_CREATE
+              - RECIPE_UPDATE
+              - COMMENT_POST
+              - RATING_GIVE
+              - LOGIN
+              - LOGOUT
+              - PROFILE_UPDATE
+        - name: dateFrom
+          in: query
+          description: Activities after date
+          schema:
+            type: string
+            format: date-time
+        - name: dateTo
+          in: query
+          description: Activities before date
+          schema:
+            type: string
+            format: date-time
+        - $ref: ../components.yaml#/components/parameters/PageParam
+        - $ref: ../components.yaml#/components/parameters/LimitParam
+      responses:
+        "200":
+          description: User activities retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      activities:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: ../components.yaml#/components/schemas/UserActivity
+                            - type: object
+                              properties:
+                                details:
+                                  type: object
+                                  description: Activity-specific details
+                                ipAddress:
+                                  type:
+                                    - string
+                                    - "null"
+                                userAgent:
+                                  type:
+                                    - string
+                                    - "null"
+                      pagination:
+                        $ref: ../components.yaml#/components/schemas/Pagination
+                      summary:
+                        type: object
+                        properties:
+                          totalActivities:
+                            type: integer
+                          activityTypeBreakdown:
+                            type: object
+                            additionalProperties:
+                              type: integer
+                          timelineSpan:
+                            type: object
+                            properties:
+                              firstActivity:
+                                type: string
+                                format: date-time
+                              lastActivity:
+                                type: string
+                                format: date-time
+                              activeDays:
+                                type: integer
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: getAdminUsersByidActivities
+components:
+  schemas:
+    AdminUserView:
+      allOf:
+        - $ref: ../components.yaml#/components/schemas/User
+        - type: object
+          properties:
+            stats:
+              $ref: "#/components/schemas/UserContentStats"
+            recentActivity:
+              $ref: "#/components/schemas/UserActivitySummary"
+            riskFlags:
+              type: array
+              items:
+                type: string
+            adminNotes:
+              type:
+                - string
+                - "null"
+              description: Admin notes about this user
+    UserContentStats:
+      type: object
+      properties:
+        recipesCount:
+          type: integer
+        approvedRecipes:
+          type: integer
+        pendingRecipes:
+          type: integer
+        rejectedRecipes:
+          type: integer
+        favoritesCount:
+          type: integer
+        ratingsCount:
+          type: integer
+        commentsCount:
+          type: integer
+        totalLogins:
+          type: integer
+        accountAge:
+          type: integer
+          description: Account age in days
+        lastActiveDate:
+          type:
+            - string
+            - "null"
+          format: date-time
+    UserActivitySummary:
+      type: object
+      properties:
+        lastRecipeCreated:
+          type:
+            - string
+            - "null"
+          format: date-time
+        lastComment:
+          type:
+            - string
+            - "null"
+          format: date-time
+        lastRating:
+          type:
+            - string
+            - "null"
+          format: date-time
+        activityScore:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Computed activity score
+    UserLockInfo:
+      type: object
+      properties:
+        isLocked:
+          type: boolean
+        reason:
+          type:
+            - string
+            - "null"
+        lockUntil:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: Auto-unlock date (null = permanent)
+        lockedBy:
+          type:
+            - string
+            - "null"
+          format: uuid
+          description: Admin who locked the account
+        lockedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        duration:
+          type:
+            - integer
+            - "null"
+          description: Original lock duration in days
+    UserRiskAssessment:
+      type: object
+      properties:
+        riskScore:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Computed risk score based on behavior patterns
+        flags:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                enum:
+                  - SUSPICIOUS_LOGIN
+                  - CONTENT_VIOLATION
+                  - SPAM_BEHAVIOR
+                  - MULTIPLE_REPORTS
+                  - UNUSUAL_ACTIVITY
+              severity:
+                type: string
+                enum:
+                  - LOW
+                  - MEDIUM
+                  - HIGH
+                  - CRITICAL
+              description:
+                type: string
+              detectedAt:
+                type: string
+                format: date-time
+              autoResolved:
+                type: boolean
+                default: false
+        recommendations:
+          type: array
+          items:
+            type: string
+          description: Recommended admin actions based on risk assessment
+        lastAssessment:
+          type: string
+          format: date-time
+          description: When risk assessment was last calculated
+    AdminUserDetailResponse:
+      allOf:
+        - $ref: ../components.yaml#/components/schemas/UserProfile
+        - type: object
+          properties:
+            adminInfo:
+              type: object
+              properties:
+                registrationIP:
+                  type: string
+                emailVerified:
+                  type: boolean
+                phoneVerified:
+                  type: boolean
+                twoFactorEnabled:
+                  type: boolean
+                lockInfo:
+                  $ref: "#/components/schemas/UserLockInfo"
+            detailedStats:
+              type: object
+              properties:
+                content:
+                  $ref: "#/components/schemas/UserContentStats"
+                engagement:
+                  type: object
+                  properties:
+                    avgSessionDuration:
+                      type: number
+                      format: float
+                    longestStreak:
+                      type: integer
+                    currentStreak:
+                      type: integer
+                social:
+                  type: object
+                  properties:
+                    recipesShared:
+                      type: integer
+                    helpfulVotesReceived:
+                      type: integer
+                    helpfulVotesGiven:
+                      type: integer
+            recentActivity:
+              type: array
+              items:
+                $ref: ../components.yaml#/components/schemas/UserActivity
+            loginHistory:
+              type: array
+              items:
+                type: object
+                properties:
+                  timestamp:
+                    type: string
+                    format: date-time
+                  ipAddress:
+                    type: string
+                  userAgent:
+                    type: string
+                  sessionDuration:
+                    type: integer
+                  location:
+                    type:
+                      - string
+                      - "null"
+            riskAssessment:
+              $ref: "#/components/schemas/UserRiskAssessment"
+    UserManagementSummary:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+        statusBreakdown:
+          type: object
+          properties:
+            VERIFIED:
+              type: integer
+            PENDING:
+              type: integer
+            LOCKED:
+              type: integer
+        newUsersThisMonth:
+          type: integer
+        activeUsersLastWeek:
+          type: integer
+        lockedUsersCount:
+          type: integer
+        usersRequiringAttention:
+          type: integer
+          description: Users with high risk scores or pending issues
+        topRiskUsers:
+          type: array
+          items:
+            type: object
+            properties:
+              userId:
+                type: string
+                format: uuid
+              email:
+                type: string
+              riskScore:
+                type: number
+                format: float
+              primaryFlag:
+                type: string
+          maxItems: 10
+    DeactivateUserExtendedRequest:
+      allOf:
+        - $ref: ../components.yaml#/components/schemas/DeactivateUserRequest
+        - type: object
+          properties:
+            notifyUser:
+              type: boolean
+              default: true
+              description: Send notification to user about account lock
+            revokeTokens:
+              type: boolean
+              default: true
+              description: Revoke all active sessions and tokens
+            escalationLevel:
+              type: string
+              enum:
+                - WARNING
+                - TEMPORARY
+                - PERMANENT
+              default: TEMPORARY
+              description: Escalation level for this action
+    UserActionResult:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+            displayName:
+              type: string
+            status:
+              type: string
+            statusChangedAt:
+              type: string
+              format: date-time
+        auditLog:
+          $ref: ../components.yaml#/components/schemas/AuditLog
+        additionalActions:
+          type: object
+          properties:
+            sessionsRevoked:
+              type: integer
+            notificationSent:
+              type: boolean
+            passwordResetRequired:
+              type: boolean
+        nextRecommendedAction:
+          type:
+            - string
+            - "null"
+          description: Suggested follow-up action
+      required:
+        - user
+        - auditLog
+

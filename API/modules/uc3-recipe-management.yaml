@@ -1,0 +1,805 @@
+paths:
+  /recipes:
+    post:
+      tags:
+        - Recipe Management
+      summary: UCS03-1 - Create new recipe
+      description: |
+        Create a new recipe with ingredients, steps, and media.
+        Recipe starts in DRAFT status and can be submitted for approval.
+
+        **Business Rules:**
+        - User must be authenticated and verified
+        - Recipe starts with status = 'DRAFT'
+        - Must have at least 1 ingredient and 1 step
+        - Supports media upload for recipe and individual steps
+        - Auto-generates order_index for ingredients and step_number for steps
+
+        **ERD Entities:** RECIPE, INGREDIENT, RECIPE_STEP, RECIPE_MEDIA
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../components.yaml#/components/schemas/CreateRecipeRequest
+            example:
+              name: Canh Chua Cá Lóc
+              description: Món canh chua truyền thống miền Nam với cá lóc tươi và rau thơm
+              categoryId: 123e4567-e89b-12d3-a456-426614174001
+              difficulty: MEDIUM
+              servings: 4
+              prepTime: 20
+              cookTime: 30
+              ingredients:
+                - name: Cá lóc
+                  amount: 500
+                  unit: gram
+                  notes: Cắt khúc vừa ăn
+                  orderIndex: 1
+                - name: Me
+                  amount: 2
+                  unit: muỗng canh
+                  orderIndex: 2
+              steps:
+                - stepNumber: 1
+                  instruction: Sơ chế cá lóc, rửa sạch và cắt khúc
+                  duration: 10
+                - stepNumber: 2
+                  instruction: Nấu nước me, cho cá vào nấu
+                  duration: 20
+              tags:
+                - Vietnamese
+                - Soup
+                - Southern
+              isPublic: true
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                recipe:
+                  $ref: ../components.yaml#/components/schemas/CreateRecipeRequest
+                thumbnailImage:
+                  type: string
+                  format: binary
+                  description: Recipe thumbnail image
+                stepImages:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: Step-by-step images
+      responses:
+        "201":
+          description: Recipe created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: ../components.yaml#/components/schemas/RecipeDetail
+              example:
+                success: true
+                data:
+                  id: 987fcdeb-51d2-43a1-b234-567890123456
+                  name: Canh Chua Cá Lóc
+                  status: DRAFT
+                  createdBy: 123e4567-e89b-12d3-a456-426614174000
+                  createdAt: 2024-01-15T10:30:00Z
+                  ingredients: []
+                  steps: []
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              examples:
+                missing_ingredients:
+                  summary: Missing required ingredients
+                  value:
+                    success: false
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Recipe must have at least 1 ingredient
+                      details:
+                        field: ingredients
+                        constraint: minItems
+                invalid_difficulty:
+                  summary: Invalid difficulty level
+                  value:
+                    success: false
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Difficulty must be EASY, MEDIUM, or HARD
+                      details:
+                        field: difficulty
+                        value: INVALID
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "413":
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+      operationId: createRecipes
+  /users/recipes:
+    get:
+      tags:
+        - Recipe Management
+      summary: UCS03-2 - Get user's recipes
+      description: |
+        Get list of recipes created by the current user with filtering and stats.
+        Shows all recipes regardless of status (DRAFT, PENDING, APPROVED, REJECTED).
+
+        **Business Rules:**
+        - Only shows recipes where created_by = current user
+        - Includes recipes in all statuses for owner view
+        - Supports filtering by status, category, difficulty
+        - Provides aggregated statistics
+
+        **ERD Entities:** RECIPE, USER
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeStatusParam
+        - name: category
+          in: query
+          description: Filter by category ID
+          schema:
+            type: string
+            format: uuid
+        - $ref: ../components.yaml#/components/parameters/DifficultyParam
+        - name: sortBy
+          in: query
+          description: Sort recipes by
+          schema:
+            type: string
+            enum:
+              - createdAt
+              - updatedAt
+              - name
+              - views
+              - rating
+            default: updatedAt
+        - name: order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+        - $ref: ../components.yaml#/components/parameters/PageParam
+        - $ref: ../components.yaml#/components/parameters/LimitParam
+      responses:
+        "200":
+          description: User recipes retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      recipes:
+                        type: array
+                        items:
+                          $ref: ../components.yaml#/components/schemas/Recipe
+                      pagination:
+                        $ref: ../components.yaml#/components/schemas/Pagination
+                      statistics:
+                        type: object
+                        properties:
+                          totalRecipes:
+                            type: integer
+                            example: 25
+                          statusCounts:
+                            type: object
+                            example:
+                              DRAFT: 8
+                              PENDING: 3
+                              APPROVED: 12
+                              REJECTED: 2
+                          totalViews:
+                            type: integer
+                            example: 15420
+                          avgRating:
+                            type: number
+                            format: float
+                            example: 4.2
+                          totalFavorites:
+                            type: integer
+                            example: 342
+              example:
+                success: true
+                data:
+                  recipes: []
+                  pagination:
+                    page: 1
+                    limit: 20
+                    total: 25
+                    totalPages: 2
+                    hasNext: true
+                    hasPrevious: false
+                  statistics:
+                    totalRecipes: 25
+                    statusCounts:
+                      DRAFT: 8
+                      PENDING: 3
+                      APPROVED: 12
+                      REJECTED: 2
+                    totalViews: 15420
+                    avgRating: 4.2
+                    totalFavorites: 342
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+      operationId: getUsersRecipes
+  /recipes/{recipeId}/edit:
+    get:
+      tags:
+        - Recipe Management
+      summary: Get recipe for editing
+      description: |
+        Get recipe details for editing form.
+        Only recipe owner can access this endpoint.
+
+        **ERD Entities:** RECIPE, INGREDIENT, RECIPE_STEP, RECIPE_MEDIA
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+      responses:
+        "200":
+          description: Recipe edit data retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    allOf:
+                      - $ref: ../components.yaml#/components/schemas/RecipeDetail
+                      - type: object
+                        properties:
+                          editInfo:
+                            type: object
+                            properties:
+                              canEdit:
+                                type: boolean
+                                description: Whether recipe can be edited
+                              canSubmit:
+                                type: boolean
+                                description: Whether recipe can be submitted for approval
+                              canDelete:
+                                type: boolean
+                                description: Whether recipe can be deleted
+                              statusHistory:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    status:
+                                      type: string
+                                    changedAt:
+                                      type: string
+                                      format: date-time
+                                    reason:
+                                      type:
+                                        - string
+                                        - "null"
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: getRecipesByidEdit
+    put:
+      tags:
+        - Recipe Management
+      summary: UCS03-3 - Update recipe
+      description: |
+        Update recipe information, ingredients, steps, and media.
+        Only recipe owner can update. Status restrictions apply.
+
+        **Business Rules:**
+        - Only recipe owner (created_by) can update
+        - APPROVED recipes cannot be edited (must create new version)
+        - PENDING recipes can only update media and notes
+        - DRAFT recipes can be fully edited
+        - Updates updatedAt timestamp automatically
+
+        **ERD Entities:** RECIPE, INGREDIENT, RECIPE_STEP, RECIPE_MEDIA
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              allOf:
+                - $ref: ../components.yaml#/components/schemas/CreateRecipeRequest
+                - type: object
+                  properties:
+                    submitForApproval:
+                      type: boolean
+                      default: false
+                      description: Submit for approval after update
+            example:
+              name: Canh Chua Cá Lóc Cải Tiến
+              description: Phiên bản cải tiến với thêm dứa và đậu bắp
+              ingredients:
+                - name: Cá lóc
+                  amount: 500
+                  unit: gram
+                  orderIndex: 1
+                - name: Dứa
+                  amount: 100
+                  unit: gram
+                  notes: Cắt múi vừa
+                  orderIndex: 2
+              submitForApproval: true
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                recipe:
+                  type: object
+                newThumbnail:
+                  type: string
+                  format: binary
+                newStepImages:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                removeImageIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: IDs of images to remove
+      responses:
+        "200":
+          description: Recipe updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    allOf:
+                      - $ref: ../components.yaml#/components/schemas/RecipeDetail
+                      - type: object
+                        properties:
+                          statusChanged:
+                            type: boolean
+                            description: Whether status was changed
+                          newStatus:
+                            type:
+                              - string
+                              - "null"
+                            description: New status if changed
+        "400":
+          description: Update validation error
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              examples:
+                cannot_edit_approved:
+                  summary: Cannot edit approved recipe
+                  value:
+                    success: false
+                    error:
+                      code: EDIT_NOT_ALLOWED
+                      message: Approved recipes cannot be edited. Create a new version instead.
+                pending_limited_edit:
+                  summary: Limited edit for pending recipe
+                  value:
+                    success: false
+                    error:
+                      code: LIMITED_EDIT_ONLY
+                      message: Pending recipes can only update media and notes
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: updateRecipesByidEdit
+    delete:
+      tags:
+        - Recipe Management
+      summary: UCS03-4 - Delete recipe
+      description: |
+        Delete user's recipe with confirmation.
+        Uses soft delete to preserve audit trail and references.
+
+        **Business Rules:**
+        - Only recipe owner can delete
+        - APPROVED recipes cannot be deleted (contact admin)
+        - Soft delete: sets is_deleted = TRUE
+        - Cascades to ingredients, steps, media cleanup
+        - Preserves ratings/comments for data integrity
+
+        **ERD Entities:** RECIPE, INGREDIENT, RECIPE_STEP, RECIPE_MEDIA
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+        - name: confirmDelete
+          in: query
+          required: true
+          description: Confirmation flag (must be true)
+          schema:
+            type: boolean
+        - name: reason
+          in: query
+          description: Reason for deletion (optional)
+          schema:
+            type: string
+            maxLength: 500
+      responses:
+        "200":
+          description: Recipe deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/SuccessResponse
+              example:
+                success: true
+                message: Recipe deleted successfully
+        "400":
+          description: Delete validation error
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+              examples:
+                no_confirmation:
+                  summary: Missing delete confirmation
+                  value:
+                    success: false
+                    error:
+                      code: CONFIRMATION_REQUIRED
+                      message: Delete confirmation required (confirmDelete=true)
+                cannot_delete_approved:
+                  summary: Cannot delete approved recipe
+                  value:
+                    success: false
+                    error:
+                      code: DELETE_NOT_ALLOWED
+                      message: Approved recipes cannot be deleted. Please contact an administrator.
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: deleteRecipesByidEdit
+  /recipes/{recipeId}/media:
+    get:
+      tags:
+        - Recipe Management
+      summary: Get recipe media files
+      description: |
+        Get all media files associated with a recipe and its steps.
+
+        **ERD Entities:** RECIPE_MEDIA
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+        - name: type
+          in: query
+          description: Filter by media type
+          schema:
+            type: string
+            enum:
+              - IMAGE
+              - VIDEO
+      responses:
+        "200":
+          description: Recipe media retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      recipeMedia:
+                        type: array
+                        items:
+                          $ref: ../components.yaml#/components/schemas/RecipeMedia
+                        description: Recipe-level media (thumbnails, etc.)
+                      stepMedia:
+                        type: object
+                        additionalProperties:
+                          type: array
+                          items:
+                            $ref: ../components.yaml#/components/schemas/RecipeMedia
+                        description: Media organized by step ID
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+        "404":
+          $ref: ../components.yaml#/components/responses/NotFound
+      operationId: getRecipesByidMedia
+    post:
+      tags:
+        - Recipe Management
+      summary: Upload recipe media
+      description: |
+        Upload new media files for recipe or specific steps.
+
+        **ERD Entities:** RECIPE_MEDIA
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  minItems: 1
+                  maxItems: 10
+                stepId:
+                  type: string
+                  format: uuid
+                  description: Associate with specific step (optional)
+                mediaType:
+                  type: string
+                  enum:
+                    - IMAGE
+                    - VIDEO
+                  default: IMAGE
+                descriptions:
+                  type: array
+                  items:
+                    type: string
+                  description: Descriptions for each file
+              required:
+                - files
+      responses:
+        "201":
+          description: Media uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      uploadedMedia:
+                        type: array
+                        items:
+                          $ref: ../components.yaml#/components/schemas/RecipeMedia
+                      totalSize:
+                        type: integer
+                        description: Total upload size in bytes
+                      uploadTime:
+                        type: number
+                        format: float
+                        description: Upload processing time in seconds
+        "400":
+          description: Upload validation error
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "413":
+          description: File too large or too many files
+          content:
+            application/json:
+              schema:
+                $ref: ../components.yaml#/components/schemas/ErrorResponse
+      operationId: createRecipesByidMedia
+    delete:
+      tags:
+        - Recipe Management
+      summary: Delete recipe media
+      description: |
+        Delete specific media files from recipe.
+
+        **ERD Entities:** RECIPE_MEDIA
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: ../components.yaml#/components/parameters/RecipeIdParam
+        - name: mediaIds
+          in: query
+          required: true
+          description: Comma-separated media IDs to delete
+          schema:
+            type: string
+          example: 123e4567-e89b-12d3-a456-426614174000,987fcdeb-51d2-43a1-b234-567890123456
+      responses:
+        "200":
+          description: Media deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      deletedCount:
+                        type: integer
+                        example: 2
+                      freedSpace:
+                        type: integer
+                        description: Space freed in bytes
+                        example: 2097152
+        "400":
+          $ref: ../components.yaml#/components/responses/BadRequest
+        "401":
+          $ref: ../components.yaml#/components/responses/Unauthorized
+        "403":
+          $ref: ../components.yaml#/components/responses/Forbidden
+      operationId: deleteRecipesByidMedia
+components:
+  schemas:
+    RecipeEditInfo:
+      type: object
+      properties:
+        canEdit:
+          type: boolean
+          description: Whether recipe can be edited
+        canSubmit:
+          type: boolean
+          description: Whether can submit for approval
+        canDelete:
+          type: boolean
+          description: Whether recipe can be deleted
+        editRestrictions:
+          type: array
+          items:
+            type: string
+          description: List of current editing restrictions
+          example:
+            - Cannot edit approved recipe
+            - Limited to media updates only
+        statusHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/StatusHistoryEntry"
+    StatusHistoryEntry:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - DRAFT
+            - PENDING
+            - APPROVED
+            - REJECTED
+            - ARCHIVED
+        changedAt:
+          type: string
+          format: date-time
+        changedBy:
+          type: string
+          format: uuid
+          description: User ID who changed status
+        reason:
+          type:
+            - string
+            - "null"
+          description: Reason for status change
+        notes:
+          type:
+            - string
+            - "null"
+          description: Additional notes
+      required:
+        - status
+        - changedAt
+        - changedBy
+    UserRecipeStats:
+      type: object
+      properties:
+        totalRecipes:
+          type: integer
+        statusCounts:
+          type: object
+          properties:
+            DRAFT:
+              type: integer
+            PENDING:
+              type: integer
+            APPROVED:
+              type: integer
+            REJECTED:
+              type: integer
+            ARCHIVED:
+              type: integer
+        totalViews:
+          type: integer
+        totalFavorites:
+          type: integer
+        avgRating:
+          type:
+            - number
+            - "null"
+          format: float
+        mostPopularRecipe:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            views:
+              type: integer
+    MediaUploadResult:
+      type: object
+      properties:
+        uploadedMedia:
+          type: array
+          items:
+            $ref: ../components.yaml#/components/schemas/RecipeMedia
+        failedUploads:
+          type: array
+          items:
+            type: object
+            properties:
+              filename:
+                type: string
+              error:
+                type: string
+        totalSize:
+          type: integer
+          description: Total successful upload size
+        uploadTime:
+          type: number
+          format: float
+

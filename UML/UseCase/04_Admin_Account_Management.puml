@@ -1,0 +1,62 @@
+@startuml Admin_Account_Management
+title Use Case Diagram: Admin Account Management (UC-A4)
+
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam shadowing false
+skinparam backgroundColor white
+
+left to right direction
+
+actor "Super Admin" as SuperAdmin #FF6B6B
+
+rectangle "Admin Account Management System" {
+  usecase "UCA04-1\nView Admin List" as UC1 #E0F0FF
+  usecase "UCA04-2\nCreate Admin Account" as UC2 #FFE4B5
+  usecase "UCA04-3\nAssign Permissions" as UC3 #FFB6C1
+  usecase "UCA04-4\nDelete Admin Account" as UC4 #E0F0FF
+}
+
+SuperAdmin --> UC1
+SuperAdmin --> UC2
+SuperAdmin --> UC3
+SuperAdmin --> UC4
+
+' Relationships
+UC2 ..> UC1 : <<include>>
+UC3 ..> UC1 : <<include>>
+UC4 ..> UC1 : <<include>>
+
+note right of UC1
+  View all admin accounts
+  Filter by role/status
+  View activity logs
+end note
+
+note right of UC2
+  Create pending account
+  Send activation email
+  Batch import from CSV
+end note
+
+note right of UC3
+  **HIGH PRIORITY**
+  RBAC/ABAC implementation
+  Least privilege principle
+  Role templates
+  Effective permissions view
+  Full audit trail
+end note
+
+note right of UC4
+  Require confirmation
+  Prevent last super admin deletion
+  Archive instead of delete
+  Audit trail
+end note
+
+@enduml
+
+
+
+
